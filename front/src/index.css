@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght,XOPQ,XTRA,YOPQ,YTDE,YTFI,YTLC,YTUC@8..144,100..1000,96,468,79,-203,738,514,712&display=swap');
+
+/* ==========================================================================
+   Design tokens
+   Primary palette: black buttons, orange accent, white base.
+   ========================================================================== */
+:root {
+  /* Brand colors */
+  --color-base: #ffffff;
+  --color-ink: #202020;
+  --color-accent: #ff7648;
+  --color-accent-soft: #ffc757;
+  --color-surface: #f0efeb;
+
+  /* Derived neutrals */
+  --color-muted: #8a8a8a;
+  --color-border: rgba(32, 32, 32, 0.1);
+  --color-field: #ffffff;
+
+  /* Accent gradient used behind auth cards */
+  --gradient-accent: radial-gradient(
+    120% 120% at 80% 20%,
+    var(--color-accent-soft) 0%,
+    var(--color-accent) 55%,
+    #e85c2b 100%
+  );
+
+  /* Typography */
+  --font-family: 'Roboto Flex', system-ui, -apple-system, sans-serif;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  /* Radii */
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 32px;
+  --radius-pill: 999px;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Elevation */
+  --shadow-card: 0 30px 60px -20px rgba(32, 32, 32, 0.25);
+  --shadow-button: 0 12px 24px -8px rgba(32, 32, 32, 0.4);
+
+  color-scheme: light;
+}
+
+/* ==========================================================================
+   Reset
+   ========================================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-family);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-ink);
+  background: var(--color-base);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}

@@ -1,0 +1,35 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Two fields side by side on wider cards, stacked on narrow ones. */
+.row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+/* Allow grid children to shrink below their content size so the icon-prefixed
+   fields never spill outside the card. */
+.row > * {
+  min-width: 0;
+}
+
+.actions {
+  margin-top: var(--space-2);
+}
+
+.footNote {
+  margin-top: var(--space-3);
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+@media (min-width: 520px) {
+  .row {
+    grid-template-columns: 1fr 1fr;
+  }
+}

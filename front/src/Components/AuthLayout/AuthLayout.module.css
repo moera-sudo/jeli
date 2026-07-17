@@ -1,0 +1,111 @@
+.page {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--color-surface);
+}
+
+/* Left decorative panel — hidden on small screens. */
+.aside {
+  position: relative;
+  display: none;
+  overflow: hidden;
+  padding: var(--space-7);
+  color: var(--color-base);
+  background: var(--gradient-accent);
+}
+
+.asideContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.brand {
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.02em;
+}
+
+.tagline {
+  max-width: 22ch;
+  font-size: clamp(1.75rem, 3vw, 2.75rem);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+}
+
+.asideFoot {
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+/* Soft blurred blob for depth, echoing the design reference. */
+.blob {
+  position: absolute;
+  width: 60%;
+  aspect-ratio: 1;
+  right: -10%;
+  bottom: -15%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.55), transparent 65%);
+  filter: blur(10px);
+}
+
+/* Right side — the form column. */
+.main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+}
+
+.card {
+  width: 100%;
+  max-width: 440px;
+  padding: clamp(var(--space-5), 5vw, var(--space-7));
+  background: var(--color-base);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.title {
+  font-size: clamp(1.75rem, 5vw, 2.25rem);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+}
+
+.switchHint {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  text-align: right;
+}
+
+.switchLink {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+.switchLink:hover {
+  text-decoration: underline;
+}
+
+/* Desktop: two-column split. */
+@media (min-width: 900px) {
+  .page {
+    grid-template-columns: 1.1fr 1fr;
+  }
+
+  .aside {
+    display: block;
+  }
+}
