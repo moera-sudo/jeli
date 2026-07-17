@@ -2,17 +2,54 @@
   min-height: 100dvh;
   display: grid;
   grid-template-columns: 1fr;
-  background: var(--color-surface);
+  background: var(--color-base);
 }
 
-/* Left decorative panel — hidden on small screens. */
 .aside {
-  position: relative;
   display: none;
+  padding: var(--space-4);
+  background: var(--color-base);
+}
+
+.frame {
+  position: relative;
   overflow: hidden;
+  height: 100%;
   padding: var(--space-7);
   color: var(--color-base);
   background: var(--gradient-accent);
+  border-radius: var(--radius-lg);
+}
+
+.frame::before {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  z-index: 0;
+  background: radial-gradient(
+    40% 40% at 30% 30%,
+    var(--color-accent-soft) 0%,
+    transparent 60%
+  );
+  opacity: 0.7;
+  transform: translate3d(0, 0, 0);
+  animation: drift 24s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(-6%, -4%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(8%, 6%, 0) scale(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame::before {
+    animation: none;
+  }
 }
 
 .asideContent {
@@ -25,21 +62,27 @@
 }
 
 .brand {
-  font-size: 1.25rem;
+  height: 70px;
+  width: 70px;
+}
+
+.asideHeading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.asideEyebrow {
+  font-size: 0.95rem;
   font-weight: var(--font-weight-medium);
-  letter-spacing: 0.02em;
+  opacity: 0.85;
 }
 
 .tagline {
-  max-width: 22ch;
+  max-width: 20ch;
   font-size: clamp(1.75rem, 3vw, 2.75rem);
   font-weight: var(--font-weight-bold);
   line-height: 1.1;
-}
-
-.asideFoot {
-  font-size: 0.9rem;
-  opacity: 0.85;
 }
 
 /* Soft blurred blob for depth, echoing the design reference. */
@@ -59,23 +102,28 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-5);
+  background: var(--color-base);
 }
 
 .card {
   width: 100%;
-  max-width: 440px;
-  padding: clamp(var(--space-5), 5vw, var(--space-7));
+  max-width: 420px;
+  padding: clamp(var(--space-5), 10vw, var(--space-6));
   background: var(--color-base);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-soft);
 }
 
 .header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-2);
   margin-bottom: var(--space-6);
+}
+
+.eyebrow {
+  font-size: 0.9rem;
+  color: var(--color-muted);
 }
 
 .title {
@@ -85,9 +133,10 @@
 }
 
 .switchHint {
+  margin-top: var(--space-5);
   font-size: 0.85rem;
   color: var(--color-muted);
-  text-align: right;
+  text-align: center;
 }
 
 .switchLink {
@@ -99,10 +148,9 @@
   text-decoration: underline;
 }
 
-/* Desktop: two-column split. */
 @media (min-width: 900px) {
   .page {
-    grid-template-columns: 1.1fr 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 
   .aside {

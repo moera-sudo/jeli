@@ -9,21 +9,29 @@ import styles from './AuthLayout.module.css'
  *
  * @param {object} props
  * @param {string} props.title          Card heading (e.g. "Log in").
+ * @param {string} [props.subtitle]     Small line shown above the title.
  * @param {object} props.switchTo       The cross-link to the other auth screen.
  * @param {string} props.switchTo.label Link text.
  * @param {string} props.switchTo.to    Target route path.
  * @param {string} props.switchTo.hint  Text shown before the link.
  * @param {React.ReactNode} props.children  The form.
  */
-export default function AuthLayout({ title, switchTo, children }) {
+export default function AuthLayout({ title, subtitle, switchTo, children }) {
   return (
     <div className={styles.page}>
+      {/* Left: orange panel floating inside a white frame. */}
       <aside className={styles.aside}>
-        <span className={styles.blob} aria-hidden="true" />
-        <div className={styles.asideContent}>
-          <span className={styles.brand}>Jeli</span>
-          <p className={styles.tagline}>Добро пожаловать в ваше рабочее пространство.</p>
-          <span className={styles.asideFoot}>Просто. Быстро. Ваше.</span>
+        <div className={styles.frame}>
+          <span className={styles.blob} aria-hidden="true" />
+          <div className={styles.asideContent}>
+            <img className={styles.brand} src="/src/assets/logo_2.png" alt="Brand Logo" />
+            <div className={styles.asideHeading}>
+              <span className={styles.asideEyebrow}>Краудсорсинговый конструктор родословной. Позвольте нашему алгоритму найти пересечения с тысячами других пользователей и связать вас с кровными родственниками.</span>
+              <p className={styles.tagline}>
+                Воссоедините свой род в один клик.
+              </p>
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -31,16 +39,19 @@ export default function AuthLayout({ title, switchTo, children }) {
         <section className={styles.card}>
           <header className={styles.header}>
             <h1 className={styles.title}>{title}</h1>
-            {switchTo && (
-              <p className={styles.switchHint}>
-                {switchTo.hint}{' '}
-                <Link className={styles.switchLink} to={switchTo.to}>
-                  {switchTo.label}
-                </Link>
-              </p>
-            )}
+            {subtitle && <span className={styles.eyebrow}>{subtitle}</span>}
           </header>
+
           {children}
+
+          {switchTo && (
+            <p className={styles.switchHint}>
+              {switchTo.hint}{' '}
+              <Link className={styles.switchLink} to={switchTo.to}>
+                {switchTo.label}
+              </Link>
+            </p>
+          )}
         </section>
       </main>
     </div>

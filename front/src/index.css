@@ -5,17 +5,26 @@
    Primary palette: black buttons, orange accent, white base.
    ========================================================================== */
 :root {
-  /* Brand colors */
-  --color-base: #ffffff;
-  --color-ink: #202020;
-  --color-accent: #ff7648;
-  --color-accent-soft: #ffc757;
-  --color-surface: #f0efeb;
+  /* ------------------------------------------------------------------ *
+   * Primary palette — black, white, orange. Everything else derives    *
+   * from these three so the whole app stays on one system.             *
+   * ------------------------------------------------------------------ */
+  --color-black: #1a1a1a;
+  --color-white: #ffffff;
+  --color-orange: #ff7648;
+  --color-orange-soft: #ffc757;
+
+  /* Semantic aliases (use these in components) */
+  --color-base: var(--color-white);   /* page + card background */
+  --color-ink: var(--color-black);    /* primary text + buttons */
+  --color-accent: var(--color-orange);
+  --color-accent-soft: var(--color-orange-soft);
+  --color-surface: var(--color-white); /* app canvas — pure white, no tint */
 
   /* Derived neutrals */
   --color-muted: #8a8a8a;
-  --color-border: rgba(32, 32, 32, 0.1);
-  --color-field: #ffffff;
+  --color-border: rgba(26, 26, 26, 0.12);
+  --color-field: var(--color-white);
 
   /* Accent gradient used behind auth cards */
   --gradient-accent: radial-gradient(
@@ -31,10 +40,10 @@
   --font-weight-medium: 500;
   --font-weight-bold: 700;
 
-  /* Radii */
-  --radius-sm: 12px;
-  --radius-md: 20px;
-  --radius-lg: 32px;
+  /* Radii — squared off: edges are only slightly rounded. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
   --radius-pill: 999px;
 
   /* Spacing scale */
@@ -47,8 +56,9 @@
   --space-7: 48px;
 
   /* Elevation */
-  --shadow-card: 0 30px 60px -20px rgba(32, 32, 32, 0.25);
-  --shadow-button: 0 12px 24px -8px rgba(32, 32, 32, 0.4);
+  --shadow-card: 0 30px 60px -20px rgba(26, 26, 26, 0.25);
+  --shadow-soft: 0 10px 30px -12px rgba(26, 26, 26, 0.15);
+  --shadow-button: 0 12px 24px -8px rgba(26, 26, 26, 0.4);
 
   color-scheme: light;
 }

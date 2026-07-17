@@ -7,10 +7,6 @@ import { MailIcon, LockIcon, ArrowRightIcon } from '../../UI/icons'
 import { ROUTES } from '../../Routes/routes'
 import styles from './AuthForm.module.css'
 
-/**
- * Экран авторизации — только вёрстка.
- * Отправка просто перенаправляет на главную; реальная аутентификация вне рамок задачи.
- */
 export default function LoginPage() {
   const navigate = useNavigate()
 
@@ -22,6 +18,7 @@ export default function LoginPage() {
   return (
     <AuthLayout
       title="Вход"
+      subtitle="Войдите, чтобы продолжить работу с родословной."
       switchTo={{ hint: 'Нет аккаунта?', label: 'Зарегистрироваться', to: ROUTES.register }}
     >
       <form className={styles.form} onSubmit={handleSubmit}>
