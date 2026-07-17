@@ -15,6 +15,12 @@
   transform: translateY(1px);
 }
 
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Primary: solid black pill — the main call to action. */
 .primary {
   background: var(--color-ink);

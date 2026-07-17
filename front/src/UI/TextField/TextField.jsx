@@ -4,7 +4,8 @@ import styles from './TextField.module.css'
 
 /**
  * A labelled, icon-prefixed text input.
- * Presentational only — no validation or state logic lives here.
+ * Presentational only — validation logic lives in the caller; this component
+ * just renders the error message it is handed.
  *
  * @param {object}   props
  * @param {string}   props.label       Visible field label.
@@ -13,6 +14,9 @@ import styles from './TextField.module.css'
  * @param {string}  [props.placeholder]
  * @param {string}  [props.name]
  * @param {string}  [props.autoComplete]
+ * @param {string}  [props.value]       Controlled value.
+ * @param {(e: React.ChangeEvent<HTMLInputElement>) => void} [props.onChange]
+ * @param {string}  [props.error]       Validation message; shown when truthy.
  */
 export default function TextField({
   label,
@@ -21,15 +25,25 @@ export default function TextField({
   placeholder,
   name,
   autoComplete,
+  value,
+  onChange,
+  error,
+  ...rest
 }) {
   const id = useId()
+  const errorId = `${id}-error`
+  const hasError = Boolean(error)
+
+  const controlClassName = [styles.control, hasError ? styles.controlError : '']
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div className={styles.field}>
       <label className={styles.label} htmlFor={id}>
         {label}
       </label>
-      <div className={styles.control}>
+      <div className={controlClassName}>
         {icon && <span className={styles.icon}>{icon}</span>}
         <input
           id={id}
@@ -37,9 +51,19 @@ export default function TextField({
           type={type}
           placeholder={placeholder}
           autoComplete={autoComplete}
+          value={value}
+          onChange={onChange}
           className={styles.input}
+          aria-invalid={hasError}
+          aria-describedby={hasError ? errorId : undefined}
+          {...rest}
         />
       </div>
+      {hasError && (
+        <span id={errorId} className={styles.error} role="alert">
+          {error}
+        </span>
+      )}
     </div>
   )
 }

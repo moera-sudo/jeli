@@ -30,6 +30,19 @@
   box-shadow: 0 0 0 4px rgba(255, 118, 72, 0.12);
 }
 
+/* Invalid state — red outline, overrides the focus accent. */
+.controlError,
+.controlError:focus-within {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.12);
+}
+
+.error {
+  padding-left: var(--space-2);
+  font-size: 0.8rem;
+  color: var(--color-danger);
+}
+
 .icon {
   flex-shrink: 0;
   width: 20px;

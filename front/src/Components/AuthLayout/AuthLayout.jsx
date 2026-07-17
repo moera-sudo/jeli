@@ -24,9 +24,9 @@ export default function AuthLayout({ title, subtitle, switchTo, children }) {
         <div className={styles.frame}>
           <span className={styles.blob} aria-hidden="true" />
           <div className={styles.asideContent}>
-            <img className={styles.brand} src="/src/assets/logo_2.png" alt="Brand Logo" />
+            <img className={styles.brand} src="/src/assets/logo_3.png" alt="Brand Logo" />
             <div className={styles.asideHeading}>
-              <span className={styles.asideEyebrow}>Краудсорсинговый конструктор родословной. Позвольте нашему алгоритму найти пересечения с тысячами других пользователей и связать вас с кровными родственниками.</span>
+              <span className={styles.asideEyebrow}>Краудсорсинговый конструктор родословной</span>
               <p className={styles.tagline}>
                 Воссоедините свой род в один клик.
               </p>

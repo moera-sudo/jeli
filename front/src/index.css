@@ -25,6 +25,7 @@
   --color-muted: #8a8a8a;
   --color-border: rgba(26, 26, 26, 0.12);
   --color-field: var(--color-white);
+  --color-danger: #dc3545;
 
   /* Accent gradient used behind auth cards */
   --gradient-accent: radial-gradient(
