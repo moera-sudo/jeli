@@ -21,33 +21,61 @@
   border-radius: var(--radius-lg);
 }
 
-.frame::before {
+/* Two soft blobs drifting on opposite paths make the movement clearly
+   visible while staying gentle. Transform-only animation keeps it on the
+   GPU compositor, so it's cheap despite the larger travel. */
+.frame::before,
+.frame::after {
   content: '';
   position: absolute;
-  inset: -40%;
+  inset: -60%;
   z-index: 0;
-  background: radial-gradient(
-    40% 40% at 30% 30%,
-    var(--color-accent-soft) 0%,
-    transparent 60%
-  );
-  opacity: 0.7;
-  transform: translate3d(0, 0, 0);
-  animation: drift 24s ease-in-out infinite alternate;
   will-change: transform;
 }
 
-@keyframes drift {
+/* Bright highlight blob. */
+.frame::before {
+  background: radial-gradient(
+    38% 38% at 32% 32%,
+    var(--color-accent-soft) 0%,
+    transparent 62%
+  );
+  opacity: 0.85;
+  animation: driftA 16s ease-in-out infinite alternate;
+}
+
+/* Deeper warm blob moving the other way for contrast. */
+.frame::after {
+  background: radial-gradient(
+    42% 42% at 68% 70%,
+    #e85c2b 0%,
+    transparent 60%
+  );
+  opacity: 0.6;
+  animation: driftB 20s ease-in-out infinite alternate;
+}
+
+@keyframes driftA {
   from {
-    transform: translate3d(-6%, -4%, 0) scale(1);
+    transform: translate3d(-18%, -12%, 0) scale(1);
   }
   to {
-    transform: translate3d(8%, 6%, 0) scale(1.15);
+    transform: translate3d(22%, 16%, 0) scale(1.35);
+  }
+}
+
+@keyframes driftB {
+  from {
+    transform: translate3d(20%, 14%, 0) scale(1.2);
+  }
+  to {
+    transform: translate3d(-16%, -18%, 0) scale(1);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .frame::before {
+  .frame::before,
+  .frame::after {
     animation: none;
   }
 }
