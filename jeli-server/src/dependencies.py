@@ -1,4 +1,44 @@
 # Глобальные FastAPI-зависимости, используемые несколькими фичами одновременно.
-# Пример из CLAUDE.md — get_current_user: появится в Этапе 2 вместе с фичей auth
-# и будет декодировать access JWT (src.features.auth.service) и подгружать пользователя.
-# TODO: добавить get_current_user / get_current_user_id после реализации фичи auth.
+import logging
+import uuid
+
+from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.config.database import get_db
+from src.exceptions import UnauthorizedError
+from src.features.auth.constants import TOKEN_TYPE_ACCESS
+from src.features.auth.exceptions import InvalidTokenError
+from src.features.auth.service import decode_token
+from src.features.user import service as user_service
+from src.features.user.models import User
+
+logger = logging.getLogger(__name__)
+
+# * auto_error=False — сами формируем 401 в едином формате {"detail": ...} через UnauthorizedError.
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+async def get_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    # * Универсальная зависимость авторизации — переиспользуется во всех защищённых роутах проекта.
+    # ! Кидает UnauthorizedError (401) на отсутствующий/невалидный/просроченный токен или юзера.
+    if credentials is None:
+        logger.info("Authorization failed: missing Bearer token")
+        raise UnauthorizedError(message="Authentication required")
+
+    try:
+        user_id: uuid.UUID = decode_token(credentials.credentials, expected_type=TOKEN_TYPE_ACCESS)
+    except InvalidTokenError as exc:
+        logger.info("Authorization failed: invalid access token")
+        raise UnauthorizedError(message=exc.message) from exc
+
+    user = await user_service.get_by_id(db, user_id)
+    if user is None:
+        logger.info("Authorization failed: user %s not found", user_id)
+        raise UnauthorizedError(message="User not found")
+
+    return user

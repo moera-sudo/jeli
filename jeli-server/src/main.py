@@ -9,7 +9,7 @@ from src.config.database import engine
 from src.config.logging import setup_logging
 from src.config.settings import get_settings
 from src.exceptions import register_exception_handlers
-from src.router import api_router
+from src.router import router
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -45,10 +45,4 @@ app.add_middleware(
 )
 
 register_exception_handlers(app)
-app.include_router(api_router)
-
-
-@app.get("/health", tags=["service"], summary="Проверка работоспособности сервиса")
-async def health_check() -> dict[str, str]:
-    # * Используется docker-compose healthcheck и внешним мониторингом.
-    return {"status": "ok"}
+app.include_router(router)
