@@ -22,6 +22,9 @@
   position: relative;
   flex: 1;
   min-width: 0;
+  /* Small breathing gap before the action cluster so the header doesn't feel
+     edge-to-edge and overloaded. */
+  margin-right: var(--space-3);
 }
 
 .searchIcon {
@@ -61,7 +64,7 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4);
   flex-shrink: 0;
 }
 

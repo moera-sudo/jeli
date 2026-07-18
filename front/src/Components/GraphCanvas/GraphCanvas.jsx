@@ -1,123 +1,360 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+
+import { ROUTES } from '../../Routes/routes'
 import {
   PlusIcon,
   MinusIcon,
   FitViewIcon,
   UserIcon,
   UsersIcon,
+  ChatIcon,
+  DownloadIcon,
 } from '../../UI/icons'
 import styles from './GraphCanvas.module.css'
 
-/**
- * Layout sketch of the family-tree workspace.
- *
- * This is presentation only: it maps out where the real @xyflow/react canvas,
- * its controls, the per-node <NodeToolbar> and the generation rail will live.
- * The nodes below are static placeholders drawn with the union-node (DAG)
- * pattern described in docs/dag-page.md — two parents meet at an invisible
- * union point and children hang from it, so lines never cross.
- */
+/* ------------------------------------------------------------------ data ---
+   The graph is data-driven so the interactive DOM view and the raster export
+   are generated from one source of truth. Coordinates live in a fixed
+   840×470 stage; Y encodes generations (fixed by the backend), the union-node
+   pattern (docs/dag-page.md) keeps the edges from crossing. */
 
-/** One person card. `state` drives the visual per the three card states. */
-function PersonNode({ name, meta, state = 'registered', selected = false, style }) {
-  const className = [
-    styles.node,
-    styles[state],
-    selected ? styles.nodeSelected : '',
-  ]
+const NODE_W = 156
+const NODE_H = 62
+
+const NODES = [
+  { id: 'asan', name: 'Асан', relation: 'Дедушка', years: '1938–2009', birth: 'с. Каскелен', state: 'deceased', x: 170, y: 30 },
+  { id: 'aigul', name: 'Айгүл', relation: 'Бабушка', years: '1942–2015', birth: 'г. Талдыкорган', state: 'deceased', x: 430, y: 30 },
+  { id: 'beknur', name: 'Бекнұр', relation: 'Вы', years: 'р. 1994', birth: 'г. Алматы', state: 'registered', x: 150, y: 210, you: true },
+  { id: 'dinara', name: 'Динара', relation: 'Супруга', years: 'р. 1996', birth: 'г. Тараз', state: 'unregistered', x: 470, y: 210 },
+  { id: 'erlan', name: 'Ерлан', relation: 'Сын', years: 'р. 2018', birth: 'г. Алматы', state: 'registered', x: 210, y: 390 },
+  { id: 'maya', name: 'Мая', relation: 'Дочь', years: 'р. 2021', birth: 'г. Алматы', state: 'unregistered', x: 480, y: 390 },
+]
+
+const EDGE_PATHS = [
+  'M248 92 L378 140', // Асан → U1
+  'M508 92 L378 140', // Айгүл → U1
+  'M378 140 L228 210', // U1 → Бекнұр
+  'M228 272 L423 320', // Бекнұр → U2
+  'M548 272 L423 320', // Динара → U2
+  'M423 320 L288 390', // U2 → Ерлан
+  'M423 320 L558 390', // U2 → Мая
+]
+
+const UNIONS = [
+  { x: 378, y: 140 },
+  { x: 423, y: 320 },
+]
+
+const RELATIVE_ACTIONS = ['+ Отец', '+ Мать', '+ Супруг(а)', '+ Ребёнок', '+ Брат/сестра']
+
+const ZOOM_MIN = 0.5
+const ZOOM_MAX = 2
+const ZOOM_STEP = 0.15
+
+/* --------------------------------------------------------- person node --- */
+function PersonNode({ node, onEnter, onLeave, onContext }) {
+  const className = [styles.node, styles[node.state], node.you ? styles.nodeSelected : '']
     .filter(Boolean)
     .join(' ')
 
   return (
-    <div className={className} style={style}>
+    <div
+      className={className}
+      style={{ left: node.x, top: node.y }}
+      onMouseEnter={(e) => onEnter(node, e.currentTarget)}
+      onMouseLeave={onLeave}
+      onContextMenu={(e) => onContext(node, e)}
+    >
       <span className={styles.nodeAvatar} aria-hidden="true">
         <UserIcon />
-        {state !== 'deceased' && (
-          <span className={`${styles.status} ${styles[`status_${state}`]}`} />
+        {node.state !== 'deceased' && (
+          <span className={`${styles.status} ${styles[`status_${node.state}`]}`} />
         )}
       </span>
       <span className={styles.nodeText}>
-        <span className={styles.nodeName}>{name}</span>
-        <span className={styles.nodeMeta}>{meta}</span>
+        <span className={styles.nodeName}>{node.name}</span>
+        <span className={styles.nodeMeta}>{node.relation}</span>
       </span>
-
-      {/* Context toolbar — appears on the selected card (real: <NodeToolbar>). */}
-      {selected && (
-        <div className={styles.toolbar} role="toolbar" aria-label="Добавить родственника">
-          <button type="button" className={styles.toolbarBtn}>+ Отец</button>
-          <button type="button" className={styles.toolbarBtn}>+ Мать</button>
-          <button type="button" className={styles.toolbarBtn}>+ Супруг(а)</button>
-          <button type="button" className={styles.toolbarBtn}>+ Ребёнок</button>
-          <button type="button" className={styles.toolbarBtn}>+ Брат/сестра</button>
-        </div>
-      )}
     </div>
   )
 }
 
+/* --------------------------------------------------- raster export (svg) ---
+   Rebuilds the graph as a self-contained SVG string, then rasterises it to a
+   PNG/JPEG via a canvas — no external libraries. */
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function buildSvg() {
+  const W = 840
+  const H = 500
+  const edges = EDGE_PATHS.map((d) => `<path d="${d}" fill="none" stroke="rgba(26,26,26,0.28)" stroke-width="2"/>`).join('')
+  const unions = UNIONS.map((u) => `<circle cx="${u.x}" cy="${u.y}" r="5" fill="#8a8a8a"/>`).join('')
+
+  const cards = NODES.map((n) => {
+    const cx = n.x + 31
+    const cy = n.y + 31
+    const nameFill = n.state === 'deceased' ? '#8a8a8a' : '#1a1a1a'
+    const dot =
+      n.state === 'registered'
+        ? `<circle cx="${cx + 13}" cy="${cy + 13}" r="5.5" fill="#22c55e" stroke="#fff" stroke-width="2"/>`
+        : n.state === 'unregistered'
+          ? `<circle cx="${cx + 13}" cy="${cy + 13}" r="5.5" fill="#8a8a8a" stroke="#fff" stroke-width="2"/>`
+          : ''
+    return `
+      <g>
+        <rect x="${n.x}" y="${n.y}" width="${NODE_W}" height="${NODE_H}" rx="8"
+          fill="#ffffff" stroke="${n.you ? '#ff7648' : 'rgba(26,26,26,0.12)'}" stroke-width="${n.you ? 2 : 1}"/>
+        <circle cx="${cx}" cy="${cy}" r="19" fill="#f0f0f1"/>
+        <text x="${cx}" y="${cy + 5}" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="600" fill="#8a8a8a">${esc(n.name[0])}</text>
+        ${dot}
+        <text x="${n.x + 62}" y="${n.y + 28}" font-family="sans-serif" font-size="15" font-weight="600" fill="${nameFill}">${esc(n.name)}</text>
+        <text x="${n.x + 62}" y="${n.y + 45}" font-family="sans-serif" font-size="11" fill="#8a8a8a">${esc(n.relation)}</text>
+      </g>`
+  }).join('')
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <rect width="${W}" height="${H}" fill="#ffffff"/>
+    <text x="24" y="34" font-family="sans-serif" font-size="16" font-weight="700" fill="#1a1a1a">Родовое древо</text>
+    <g transform="translate(0,10)">${edges}${unions}${cards}</g>
+  </svg>`
+}
+
+function exportGraph(format) {
+  const svg = buildSvg()
+  const scale = 2
+  const img = new Image()
+  img.onload = () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = img.width * scale
+    canvas.height = img.height * scale
+    const ctx = canvas.getContext('2d')
+    if (format === 'jpeg') {
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    }
+    ctx.scale(scale, scale)
+    ctx.drawImage(img, 0, 0)
+    const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png'
+    const url = canvas.toDataURL(mime, 0.92)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `family-tree.${format === 'jpeg' ? 'jpg' : 'png'}`
+    a.click()
+  }
+  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
+/* ============================================================ component === */
 export default function GraphCanvas() {
+  const canvasRef = useRef(null)
+  const hideTimer = useRef(null)
+
+  const [zoom, setZoom] = useState(1)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [hovered, setHovered] = useState(null) // { node, left, top }
+  const [menu, setMenu] = useState(null) // { node, left, top }
+  const [exportOpen, setExportOpen] = useState(false)
+
+  const zoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2)))
+  const zoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, +(z - ZOOM_STEP).toFixed(2)))
+
+  const toggleFullscreen = () => {
+    const el = canvasRef.current
+    if (!el) return
+    if (document.fullscreenElement) {
+      document.exitFullscreen()
+    } else {
+      el.requestFullscreen?.()
+    }
+  }
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  // Overlays are fixed-positioned in viewport space (so the canvas's
+  // overflow:hidden can't clip them); live DOM rects keep them aligned at any
+  // zoom level and in fullscreen.
+  const handleEnter = useCallback((node, target) => {
+    if (hideTimer.current) clearTimeout(hideTimer.current)
+    const r = target.getBoundingClientRect()
+    setHovered({ node, left: r.left + r.width / 2, top: r.top })
+  }, [])
+
+  const handleLeave = useCallback(() => {
+    hideTimer.current = setTimeout(() => setHovered(null), 120)
+  }, [])
+
+  const keepCard = () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current)
+  }
+
+  const handleContext = useCallback((node, e) => {
+    e.preventDefault()
+    setHovered(null)
+    // Clamp to the viewport so the menu never runs off-screen.
+    const left = Math.min(e.clientX, window.innerWidth - 212)
+    const top = Math.min(e.clientY, window.innerHeight - 260)
+    setMenu({ node, left: Math.max(8, left), top: Math.max(8, top) })
+  }, [])
+
+  // Dismiss the context menu / export popover on any outside interaction.
+  useEffect(() => {
+    if (!menu && !exportOpen) return
+    const close = () => {
+      setMenu(null)
+      setExportOpen(false)
+    }
+    const onKey = (e) => e.key === 'Escape' && close()
+    window.addEventListener('pointerdown', close)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [menu, exportOpen])
+
   return (
-    <div className={styles.canvas}>
-      {/* Generation rail — Y is fixed by the backend, one row per поколение. */}
+    <div className={styles.canvas} ref={canvasRef}>
+      {/* Generation rail. */}
       <div className={styles.rail} aria-hidden="true">
         <span className={styles.railTick} style={{ top: 61 }}>I</span>
         <span className={styles.railTick} style={{ top: 241 }}>II</span>
         <span className={styles.railTick} style={{ top: 421 }}>III</span>
       </div>
 
-      {/* The graph stage. Fixed coordinate space so the connector layer and the
-          cards share the same geometry — the real canvas fits/zooms this. */}
-      <div className={styles.stage}>
-        {/* Connector layer (union-node DAG). */}
+      {/* Zoomable stage. */}
+      <div
+        className={styles.stage}
+        style={{ transform: `translate(-50%, -50%) scale(${zoom})` }}
+      >
         <svg className={styles.edges} viewBox="0 0 840 470" preserveAspectRatio="xMidYMid meet">
-          {/* Gen I parents → union U1 */}
-          <path d="M248 92 L378 140" />
-          <path d="M508 92 L378 140" />
-          {/* U1 → child (Бекнур) */}
-          <path d="M378 140 L228 210" />
-          {/* Gen II couple → union U2 */}
-          <path d="M228 272 L423 320" />
-          <path d="M548 272 L423 320" />
-          {/* U2 → children */}
-          <path d="M423 320 L288 390" />
-          <path d="M423 320 L558 390" />
-          {/* Invisible union points, drawn as small dots */}
-          <circle className={styles.union} cx="378" cy="140" r="5" />
-          <circle className={styles.union} cx="423" cy="320" r="5" />
+          {EDGE_PATHS.map((d) => (
+            <path key={d} d={d} />
+          ))}
+          {UNIONS.map((u) => (
+            <circle key={`${u.x}-${u.y}`} className={styles.union} cx={u.x} cy={u.y} r="5" />
+          ))}
         </svg>
 
-        {/* Generation I */}
-        <PersonNode name="Асан" meta="1938–2009" state="deceased" style={{ left: 170, top: 30 }} />
-        <PersonNode name="Айгүл" meta="1942–2015" state="deceased" style={{ left: 430, top: 30 }} />
-
-        {/* Generation II */}
-        <PersonNode
-          name="Бекнур"
-          meta="Вы"
-          state="registered"
-          selected
-          style={{ left: 150, top: 210 }}
-        />
-        <PersonNode name="Динара" meta="Не в приложении" state="unregistered" style={{ left: 470, top: 210 }} />
-
-        {/* Generation III */}
-        <PersonNode name="Ерлан" meta="В приложении" state="registered" style={{ left: 210, top: 390 }} />
-        <PersonNode name="Мая" meta="Не в приложении" state="unregistered" style={{ left: 480, top: 390 }} />
+        {NODES.map((node) => (
+          <PersonNode
+            key={node.id}
+            node={node}
+            onEnter={handleEnter}
+            onLeave={handleLeave}
+            onContext={handleContext}
+          />
+        ))}
       </div>
 
-      {/* Zoom / fit controls (real: <Controls /> from @xyflow/react). */}
+      {/* Hover info modal. */}
+      {hovered && (
+        <div
+          className={styles.hoverCard}
+          style={{ left: hovered.left, top: hovered.top }}
+          onMouseEnter={keepCard}
+          onMouseLeave={handleLeave}
+        >
+          <div className={styles.hoverHead}>
+            <span className={`${styles.hoverAvatar} ${styles[hovered.node.state]}`} aria-hidden="true">
+              <UserIcon />
+            </span>
+            <div>
+              <p className={styles.hoverName}>{hovered.node.name}</p>
+              <p className={styles.hoverRelation}>{hovered.node.relation}</p>
+            </div>
+          </div>
+          <dl className={styles.hoverMeta}>
+            <div><dt>Годы</dt><dd>{hovered.node.years}</dd></div>
+            <div><dt>Место рождения</dt><dd>{hovered.node.birth}</dd></div>
+          </dl>
+          {hovered.node.state === 'registered' && !hovered.node.you && (
+            <Link to={ROUTES.chat} className={styles.hoverChat}>
+              <ChatIcon /> Начать чат
+            </Link>
+          )}
+          {hovered.node.you && (
+            <Link to={ROUTES.profile} className={styles.hoverProfile}>
+              Открыть профиль
+            </Link>
+          )}
+          {hovered.node.state === 'unregistered' && (
+            <button type="button" className={styles.hoverInvite}>Пригласить</button>
+          )}
+          {hovered.node.state === 'deceased' && (
+            <p className={styles.hoverMemorial}>Мемориальная страница</p>
+          )}
+        </div>
+      )}
+
+      {/* Right-click: add-relative menu. */}
+      {menu && (
+        <div
+          className={styles.menu}
+          style={{ left: menu.left, top: menu.top }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <p className={styles.menuTitle}>{menu.node.name} · добавить</p>
+          {RELATIVE_ACTIONS.map((label) => (
+            <button
+              key={label}
+              type="button"
+              className={styles.menuItem}
+              onClick={() => setMenu(null)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Controls: zoom, fit, fullscreen, export. */}
       <div className={styles.controls}>
-        <button type="button" className={styles.control} aria-label="Приблизить"><PlusIcon /></button>
-        <button type="button" className={styles.control} aria-label="Отдалить"><MinusIcon /></button>
-        <button type="button" className={styles.control} aria-label="По размеру экрана"><FitViewIcon /></button>
+        <button type="button" className={styles.control} onClick={zoomIn} aria-label="Приблизить"><PlusIcon /></button>
+        <button type="button" className={styles.control} onClick={zoomOut} aria-label="Отдалить"><MinusIcon /></button>
+        <button
+          type="button"
+          className={`${styles.control} ${fullscreen ? styles.controlActive : ''}`}
+          onClick={toggleFullscreen}
+          aria-label={fullscreen ? 'Выйти из полноэкранного режима' : 'Во весь экран'}
+        >
+          <FullscreenIcon />
+        </button>
+        <div className={styles.exportWrap} onPointerDown={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className={`${styles.control} ${exportOpen ? styles.controlActive : ''}`}
+            onClick={() => setExportOpen((v) => !v)}
+            aria-label="Экспорт"
+            aria-expanded={exportOpen}
+          >
+            <DownloadIcon />
+          </button>
+          {exportOpen && (
+            <div className={styles.exportMenu}>
+              <button type="button" onClick={() => { exportGraph('png'); setExportOpen(false) }}>PNG</button>
+              <button type="button" onClick={() => { exportGraph('jpeg'); setExportOpen(false) }}>JPEG</button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Load-more generations — ego-centric depth limit from the docs. */}
+      {/* Zoom readout. */}
+      <span className={styles.zoomBadge}>{Math.round(zoom * 100)}%</span>
+
+      {/* Load-more generations. */}
       <button type="button" className={styles.loadMore}>
         <UsersIcon />
         Показать ещё поколение
       </button>
 
-      {/* Card-state legend — the three states from docs/dag-page.md. */}
+      {/* Card-state legend. */}
       <div className={styles.legend}>
         <span className={styles.legendItem}>
           <span className={`${styles.dot} ${styles.status_registered}`} />
@@ -133,5 +370,14 @@ export default function GraphCanvas() {
         </span>
       </div>
     </div>
+  )
+}
+
+/* Fullscreen toggle glyph (local to keep the shared icon set lean). */
+function FullscreenIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
