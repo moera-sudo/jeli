@@ -5,5 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "httptools>=0.8.0",
     "sqlalchemy>=2.0.51",
+    "uvloop>=0.22.1",
 ]
