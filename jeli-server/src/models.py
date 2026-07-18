@@ -1,0 +1,11 @@
+# Агрегатор ORM-моделей всех фич — импортируется Alembic (alembic/env.py) для autogenerate.
+# Base определён в src.config.database; каждая фича регистрирует свои модели
+# через импорт ниже, чтобы попасть в Base.metadata.
+from src.config.database import Base  # noqa: F401
+from src.features.user.models import User  # noqa: F401
+
+# TODO: раскомментировать по мере реализации
+# from src.features.graph.models import GraphLink, Person, Relationship  # noqa: F401
+# from src.features.matching.models import MatchCandidate, PersonEditLog  # noqa: F401
+# from src.features.messenger.models import Conversation, Message  # noqa: F401
+# from src.features.notifications.models import Notification  # noqa: F401

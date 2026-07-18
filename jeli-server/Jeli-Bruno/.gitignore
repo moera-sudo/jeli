@@ -1,10 +1,5 @@
-.venv
-.venv/
-./.venv/
-
 # Secrets
-.env
-
+.env*
 
 # Dependencies
 node_modules
