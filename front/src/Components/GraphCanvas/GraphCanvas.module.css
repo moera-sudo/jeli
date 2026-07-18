@@ -1,0 +1,316 @@
+/* The graph workspace: an empty field with a subtle dotted background, echoing
+   the @xyflow/react canvas. Everything floats above it in absolute layers. */
+.canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--color-surface);
+  background-image: radial-gradient(rgba(26, 26, 26, 0.14) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+  background-position: -11px -11px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+/* ------------------------------------------------------------ generation rail */
+.rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 44px;
+  z-index: 2;
+  border-right: 1px dashed var(--color-border);
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
+}
+
+.railTick {
+  position: absolute;
+  left: 0;
+  width: 44px;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-muted);
+}
+
+/* --------------------------------------------------------------------- stage */
+.stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 840px;
+  height: 470px;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
+.edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.edges path {
+  fill: none;
+  stroke: rgba(26, 26, 26, 0.28);
+  stroke-width: 2;
+}
+
+.union {
+  fill: var(--color-muted);
+}
+
+/* ---------------------------------------------------------------- node cards */
+.node {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 156px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.node:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-accent);
+}
+
+.nodeSelected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(255, 118, 72, 0.18), var(--shadow-card);
+}
+
+.nodeAvatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-pill);
+  background: #f0f0f1;
+  color: var(--color-muted);
+}
+
+.nodeAvatar svg {
+  width: 22px;
+  height: 22px;
+}
+
+.status {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--color-base);
+  border-radius: var(--radius-pill);
+}
+
+.status_registered {
+  background: #22c55e;
+}
+
+.status_unregistered {
+  background: var(--color-muted);
+}
+
+.nodeText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nodeName {
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+}
+
+.nodeMeta {
+  font-size: 0.72rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Deceased — sepia / muted memorial treatment. */
+.deceased {
+  filter: grayscale(1) sepia(0.35);
+  opacity: 0.9;
+}
+
+/* ------------------------------------------------------------- node toolbar */
+.toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  white-space: nowrap;
+  background: var(--color-ink);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-button);
+}
+
+.toolbar::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--color-ink);
+}
+
+.toolbarBtn {
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-base);
+  border-radius: var(--radius-pill);
+  transition: background 0.15s ease;
+}
+
+.toolbarBtn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* --------------------------------------------------------------- watermark */
+.watermark {
+  position: absolute;
+  left: 50%;
+  top: var(--space-5);
+  transform: translateX(-50%);
+  z-index: 1;
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-muted);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- controls */
+.controls {
+  position: absolute;
+  left: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  background: var(--color-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  color: var(--color-ink);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
+}
+
+.control:hover {
+  background: #f4f4f5;
+}
+
+.control svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* --------------------------------------------------------------- load more */
+.loadMore {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-4);
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 42px;
+  padding: 0 var(--space-4);
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink);
+  background: var(--color-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-soft);
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+
+.loadMore:hover {
+  border-color: var(--color-accent);
+  transform: translateX(-50%) translateY(-1px);
+}
+
+.loadMore svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-accent);
+}
+
+/* ------------------------------------------------------------------ legend */
+.legend {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.78rem;
+  color: var(--color-ink);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+}
+
+.dotDeceased {
+  background: #b8a99a;
+}
+
+@media (max-width: 720px) {
+  .legend {
+    display: none;
+  }
+}

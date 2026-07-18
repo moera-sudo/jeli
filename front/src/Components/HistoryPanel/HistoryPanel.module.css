@@ -1,0 +1,232 @@
+/* Slides in from the right; the graph beside it flexes to fill what's left.
+   Width animates from 0 → full so the graph visibly shrinks. */
+.panel {
+  flex-shrink: 0;
+  width: 0;
+  overflow: hidden;
+  transition: width 0.32s ease, margin-left 0.32s ease;
+}
+
+.open {
+  width: min(460px, 42vw);
+  margin-left: var(--space-4);
+}
+
+/* Fixed-width inner shell so content doesn't reflow while the width animates. */
+.inner {
+  display: flex;
+  flex-direction: column;
+  width: min(460px, 42vw);
+  height: 100%;
+  background: var(--color-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+/* -------------------------------------------------------------------- head */
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.title {
+  font-size: 1.15rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.subtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  color: var(--color-muted);
+  border-radius: var(--radius-pill);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.close:hover {
+  background: #f4f4f5;
+  color: var(--color-ink);
+}
+
+.close svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* --------------------------------------------------------------- doc title */
+.docTitle {
+  margin: var(--space-4) var(--space-5) 0;
+  padding-bottom: var(--space-3);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  outline: none;
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-bold);
+  background: transparent;
+}
+
+.docTitle::placeholder {
+  color: var(--color-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+/* -------------------------------------------------------------------- tabs */
+.tabs {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.tab {
+  position: relative;
+  padding-bottom: var(--space-2);
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-muted);
+  transition: color 0.2s ease;
+}
+
+.tab:hover {
+  color: var(--color-ink);
+}
+
+.tabActive {
+  color: var(--color-ink);
+}
+
+.tabActive::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+}
+
+/* ----------------------------------------------------------------- toolbar */
+.toolbar {
+  display: flex;
+  gap: 2px;
+  margin: var(--space-3) var(--space-5) 0;
+  padding: 4px;
+  background: #f4f4f5;
+  border-radius: var(--radius-md);
+}
+
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--color-ink);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
+}
+
+.tool:hover {
+  background: var(--color-base);
+}
+
+.tool svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ------------------------------------------------------------- editor area */
+.editorArea {
+  flex: 1;
+  min-height: 0;
+  margin: var(--space-3) var(--space-5) 0;
+}
+
+.editor {
+  width: 100%;
+  height: 100%;
+  padding: var(--space-3) 0;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--color-ink);
+}
+
+.editor::placeholder {
+  color: var(--color-muted);
+}
+
+/* Rendered Markdown preview. */
+.preview {
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--space-3) 0;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.preview h1 {
+  font-size: 1.4rem;
+  margin-bottom: var(--space-3);
+}
+
+.preview p {
+  margin-bottom: var(--space-3);
+}
+
+.preview ul {
+  padding-left: var(--space-5);
+  margin-bottom: var(--space-3);
+}
+
+.preview li {
+  margin-bottom: var(--space-1);
+}
+
+.preview blockquote {
+  padding: var(--space-2) var(--space-4);
+  border-left: 3px solid var(--color-accent);
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* -------------------------------------------------------------------- foot */
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.saved {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+/* Trim the shared Button down to fit the footer. */
+.foot :global(button) {
+  height: 44px;
+  padding: 0 var(--space-5);
+}

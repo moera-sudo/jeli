@@ -1,0 +1,22 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--color-base);
+}
+
+/* The canvas fills everything below the header, with a small breathing frame
+   so the rounded workspace reads as a distinct surface. The graph and the
+   history panel sit side by side; the graph flexes so it shrinks when the
+   panel opens. */
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4);
+}
+
+.graphWrap {
+  flex: 1;
+  min-width: 0;
+}
