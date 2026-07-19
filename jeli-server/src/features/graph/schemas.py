@@ -1,10 +1,10 @@
 # Pydantic-схемы фичи graph: узлы/рёбра графа (light+heavy), запросы на создание/правку персон и связей,
 # предложения брака, чтение кандидатов в мэтчи, делегирование прав редактирования.
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 Gender = Literal["male", "female"]
 BirthYearPrecision = Literal["exact", "decade", "generation_estimate", "unknown"]
@@ -102,6 +102,9 @@ class PersonDetail(BaseModel):
     relation_to_viewer: str | None
     chat_thread_id: uuid.UUID | None
     top_matches: list[MatchCandidateRead]
+    # * Может ли текущий пользователь редактировать этот узел (owner/коллаборатор/сам живой человек) —
+    # * фронт использует, чтобы показывать/скрывать кнопки редактирования/удаления/"сделать коллаборатором".
+    can_edit: bool
 
 
 class PersonRelationInput(BaseModel):
@@ -134,6 +137,31 @@ class PersonCreateRequest(BaseModel):
     relation: PersonRelationInput | None = None
 
 
+class PersonInsertBetweenRequest(BaseModel):
+    # * Вставляет нового человека между двумя УЖЕ существующими напрямую связанными узлами
+    # * (child_id --child_of--> parent_id) — без риска каскадного удаления при исправлении
+    # * пропущенного поколения. См. service.insert_person_between.
+    full_name: str = Field(min_length=1, max_length=255)
+    gender: Gender
+    avatar_url: str | None = None
+    is_alive: bool = True
+    birth_year_value: int | None = None
+    birth_year_precision: BirthYearPrecision = "unknown"
+    death_year_value: int | None = None
+    death_year_precision: DeathYearPrecision = "unknown"
+    death_context: DeathContext | None = None
+    birth_country: str | None = None
+    birth_region: str | None = None
+    ru: str | None = None
+    tribe: str | None = None
+    zhuz: str | None = None
+    source_type: SourceType = "oral_tradition"
+    has_attached_file: bool = False
+    file_url: str | None = None
+    parent_id: uuid.UUID
+    child_id: uuid.UUID
+
+
 class PersonUpdateRequest(BaseModel):
     # * Все поля опциональны, паттерн exclude_unset как в user.ProfileUpdateRequest.
     full_name: str | None = None
@@ -163,6 +191,13 @@ class RelationshipCreateRequest(BaseModel):
     type: Literal["child_of"] = "child_of"
 
 
+class RelationshipUpdateRequest(BaseModel):
+    # * PATCH /relationships/{id} — правка marriage_year/marriage_end_reason без удаления ребра
+    # * (развод/вдовство сохраняются как история брака, а не стираются вместе с ребром).
+    marriage_year: int | None = None
+    marriage_end_reason: MarriageEndReason | None = None
+
+
 class RelationshipRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -176,8 +211,10 @@ class RelationshipRead(BaseModel):
 
 
 class MarriageProposalCreateRequest(BaseModel):
+    # * person_b раскрывается через invite_code — у владельца одного графа нет и не может быть
+    # * person_id чужого узла (глобального поиска графов нет и не планируется).
     person_a_id: uuid.UUID
-    person_b_id: uuid.UUID
+    target_invite_code: str
     marriage_year: int | None = None
 
 
@@ -199,9 +236,14 @@ class InviteCodeResponse(BaseModel):
     invite_code: str
 
 
+class GraphJoinRequest(BaseModel):
+    invite_code: str
+
+
 class CollaboratorGrantRequest(BaseModel):
-    # * Приглашаем коллаборатора по email — не всем известны чужие user_id.
-    collaborator_email: EmailStr
+    # * Коллаборатором можно сделать только уже живой зарегистрированный узел твоего графа —
+    # * выбирается по person_id (мини-карточка узла на фронте), не по email.
+    person_id: uuid.UUID
 
 
 class CollaboratorRead(BaseModel):
@@ -211,3 +253,12 @@ class CollaboratorRead(BaseModel):
     graph_owner_id: uuid.UUID
     collaborator_user_id: uuid.UUID
     created_at: datetime
+
+
+class SuccessorCandidate(BaseModel):
+    # * Кандидат на передачу владения графом при self-delete/self-unlink — из Users, не Person.
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    full_name: str
+    avatar_url: str

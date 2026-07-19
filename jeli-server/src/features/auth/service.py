@@ -83,14 +83,12 @@ def decode_token(token: str, expected_type: str) -> uuid.UUID:
         raise InvalidTokenError()
 
 
-async def _ensure_root_person(db: AsyncSession, user: User, gender: str, graph_invite_code: str | None) -> None:
-    # * Если передан код приглашения — пробуем привязать существующий узел; если код не найден/невалиден,
-    # * тихий fallback на обычный self-root (без хардвалидации, как и договаривались).
-    linked = None
+async def _try_link_invite_code(db: AsyncSession, user: User, graph_invite_code: str | None) -> None:
+    # * Best-effort: если передан код приглашения — пробуем привязать существующий узел.
+    # * Дерево при регистрации больше НЕ создаётся автоматически (см. POST /graph/create, /graph/join) —
+    # * если код невалиден/уже занят, просто ничего не происходит, без ошибки.
     if graph_invite_code:
-        linked = await graph_service.link_existing_person_by_invite_code(db, user, graph_invite_code)
-    if linked is None:
-        await graph_service.create_root_person_for_user(db, user, gender)
+        await graph_service.link_existing_person_by_invite_code(db, user, graph_invite_code)
 
 
 async def register(db: AsyncSession, data: RegisterRequest) -> tuple[User, str, str]:
@@ -106,7 +104,7 @@ async def register(db: AsyncSession, data: RegisterRequest) -> tuple[User, str, 
         full_name=data.full_name,
         graph_invite_code=data.graph_invite_code,
     )
-    await _ensure_root_person(db, user, data.gender, data.graph_invite_code)
+    await _try_link_invite_code(db, user, data.graph_invite_code)
     access_token, refresh_token = create_token_pair(user.id)
     logger.info("User registered: %s", user.id)
     return user, access_token, refresh_token
@@ -132,7 +130,7 @@ async def register_with_info(db: AsyncSession, data: RegisterWithInfoRequest) ->
         await db.commit()
         await db.refresh(user)
 
-    await _ensure_root_person(db, user, data.gender, data.graph_invite_code)
+    await _try_link_invite_code(db, user, data.graph_invite_code)
     access_token, refresh_token = create_token_pair(user.id)
     logger.info("User registered with full profile info: %s", user.id)
     return user, access_token, refresh_token

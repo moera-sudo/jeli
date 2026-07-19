@@ -1,7 +1,7 @@
 # Хелперы фичи graph: нормализация имени под pg_trgm, генерация invite-кодов.
 import secrets
 
-from src.features.graph.constants import INVITE_CODE_BYTES
+from src.features.graph.constants import INVITE_CODE_ALPHABET, INVITE_CODE_LENGTH
 
 
 def normalize_name(full_name: str) -> str:
@@ -10,4 +10,5 @@ def normalize_name(full_name: str) -> str:
 
 
 def generate_invite_code() -> str:
-    return secrets.token_urlsafe(INVITE_CODE_BYTES)
+    # * 8 символов Crockford Base32 — вручную читается/вводится без путаницы (0/O, 1/I/L).
+    return "".join(secrets.choice(INVITE_CODE_ALPHABET) for _ in range(INVITE_CODE_LENGTH))

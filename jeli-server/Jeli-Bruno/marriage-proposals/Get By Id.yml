@@ -1,0 +1,17 @@
+info:
+  name: Get By Id
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: http://localhost:8000/api/marriage-proposals/66666666-6666-6666-6666-666666666666
+  auth:
+    type: bearer
+    token: PASTE_ACCESS_TOKEN_HERE
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

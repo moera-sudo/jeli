@@ -64,3 +64,35 @@ class CollaboratorAlreadyExistsError(ConflictError):
 
 class CollaboratorNotFoundError(NotFoundError):
     message = "Collaborator not found"
+
+
+class AlreadyHasPersonError(ConflictError):
+    message = "You already have a person node linked to your account"
+
+
+class GenderRequiredError(ConflictError):
+    message = "Set your gender in your profile before creating a family tree"
+
+
+class InviteCodeNotFoundError(NotFoundError):
+    message = "Invite code not found"
+
+
+class DuplicateProposalError(ConflictError):
+    message = "A pending marriage proposal already exists between these two persons"
+
+
+class NoDirectRelationshipError(ConflictError):
+    message = "No direct child_of relationship exists between these two persons"
+
+
+class NotLinkedPersonError(ConflictError):
+    message = "This person is not linked to a registered account"
+
+
+class SuccessorRequiredError(ConflictError):
+    message = "Choose a successor for your graph before removing your own person node"
+
+
+class InvalidSuccessorError(ConflictError):
+    message = "Selected successor is not a valid candidate"

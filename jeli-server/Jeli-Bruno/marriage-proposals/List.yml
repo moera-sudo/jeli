@@ -1,0 +1,17 @@
+info:
+  name: List
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: http://localhost:8000/api/marriage-proposals
+  auth:
+    type: bearer
+    token: PASTE_ACCESS_TOKEN_HERE
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

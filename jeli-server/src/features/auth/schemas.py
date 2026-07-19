@@ -1,19 +1,15 @@
 # Pydantic-схемы фичи auth: запросы регистрации/логина/рефреша и ответы с токенами.
-from typing import Literal
-
 from pydantic import BaseModel, EmailStr, Field
 
 from src.features.user.schemas import OptionalProfileFields, UserMe
-
-Gender = Literal["male", "female"]
 
 
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     full_name: str = Field(min_length=1, max_length=255)
-    # * Используется только для создания корневого узла графа (Person.gender) — в Users не хранится.
-    gender: Gender
+    # * Best-effort линковка к существующему узлу графа (см. graph.service.link_existing_person_by_invite_code).
+    # * Дерево при регистрации больше не создаётся автоматически — см. POST /graph/create, /graph/join.
     graph_invite_code: str | None = None
 
 

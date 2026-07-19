@@ -1,0 +1,23 @@
+info:
+  name: Grant
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:8000/api/graph/collaborators
+  body:
+    type: json
+    data: |-
+      {
+        "person_id": "99999999-9999-9999-9999-999999999999"
+      }
+  auth:
+    type: bearer
+    token: PASTE_ACCESS_TOKEN_HERE
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

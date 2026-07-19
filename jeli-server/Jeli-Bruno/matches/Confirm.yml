@@ -1,0 +1,17 @@
+info:
+  name: Confirm
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:8000/api/matches/77777777-7777-7777-7777-777777777777/confirm
+  auth:
+    type: bearer
+    token: PASTE_ACCESS_TOKEN_HERE
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

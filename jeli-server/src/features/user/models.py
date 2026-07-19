@@ -17,6 +17,9 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     avatar_url: Mapped[str] = mapped_column(String(1024), nullable=False, default=DEFAULT_AVATAR_URL)
+    # * Nullable — не собирается на регистрации, заполняется позже через профиль. Нужен для
+    # * создания root-Person (Person.gender обязателен), см. graph.service.create_root_person_for_user.
+    gender: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     current_city: Mapped[str | None] = mapped_column(String(255), nullable=True)
     current_country: Mapped[str | None] = mapped_column(String(255), nullable=True)
