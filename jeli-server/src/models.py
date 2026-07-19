@@ -3,9 +3,16 @@
 # через импорт ниже, чтобы попасть в Base.metadata.
 from src.config.database import Base  # noqa: F401
 from src.features.user.models import User  # noqa: F401
+from src.features.graph.models import (  # noqa: F401
+    GraphCollaborator,
+    GraphLink,
+    MatchCandidate,
+    Person,
+    PersonEditLog,
+    Relationship,
+    RelationshipProposal,
+)
 
 # TODO: раскомментировать по мере реализации
-# from src.features.graph.models import GraphLink, Person, Relationship  # noqa: F401
-# from src.features.matching.models import MatchCandidate, PersonEditLog  # noqa: F401
 # from src.features.messenger.models import Conversation, Message  # noqa: F401
 # from src.features.notifications.models import Notification  # noqa: F401
