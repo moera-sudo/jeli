@@ -142,6 +142,15 @@ export function ChatIcon(props) {
   )
 }
 
+export function CameraIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" {...props}>
+      <path d="M4 8h3l1.5-2h7L18 8h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="13" r="3.4" />
+    </svg>
+  )
+}
+
 export function DownloadIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" {...props}>

@@ -11,7 +11,7 @@
   display: grid;
   grid-template-columns: 340px 1fr;
   gap: var(--space-5);
-  max-width: 1080px;
+  width: 90%;
   margin: 0 auto;
   align-items: start;
 }
@@ -37,33 +37,11 @@
   font-weight: var(--font-weight-bold);
 }
 
-.editBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  color: var(--color-muted);
-  border-radius: var(--radius-pill);
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.editBtn:hover {
-  background: #f4f4f5;
-  color: var(--color-accent);
-}
-
-.editBtn svg {
-  width: 18px;
-  height: 18px;
-}
-
 /* -------------------------------------------------------- identity column */
 .identity {
   display: flex;
   flex-direction: column;
   align-items: center;
-  text-align: center;
   position: sticky;
   top: calc(72px + var(--space-5));
 }
@@ -82,7 +60,48 @@
   box-shadow: var(--shadow-soft);
 }
 
-.avatarEdit {
+.name {
+  margin-top: var(--space-4);
+  font-size: 1.35rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 1.2;
+  text-align: center;
+}
+
+/* ---------------------------------------------- avatar upload (edit / create) */
+.avatarUpload {
+  position: relative;
+  margin-top: var(--space-2);
+  width: 132px;
+  height: 132px;
+  cursor: pointer;
+}
+
+.avatarInput {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.avatarPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--color-muted);
+  background: #f4f4f5;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-pill);
+}
+
+.avatarPlaceholder svg {
+  width: 40px;
+  height: 40px;
+}
+
+.avatarBadge {
   position: absolute;
   right: 2px;
   bottom: 2px;
@@ -98,51 +117,9 @@
   box-shadow: var(--shadow-soft);
 }
 
-.avatarEdit svg {
+.avatarBadge svg {
   width: 16px;
   height: 16px;
-}
-
-.name {
-  margin-top: var(--space-4);
-  font-size: 1.35rem;
-  font-weight: var(--font-weight-bold);
-  line-height: 1.2;
-}
-
-.handle {
-  margin-top: var(--space-2);
-  font-size: 0.85rem;
-  color: var(--color-accent);
-  font-weight: var(--font-weight-medium);
-}
-
-.contacts {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-  width: 100%;
-}
-
-.contact {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  font-size: 0.88rem;
-  color: var(--color-muted);
-  transition: color 0.2s ease;
-}
-
-.contact:hover {
-  color: var(--color-ink);
-}
-
-.contact svg {
-  width: 18px;
-  height: 18px;
-  color: var(--color-accent);
 }
 
 .identityActions {
@@ -150,6 +127,7 @@
   margin-top: var(--space-5);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--space-3);
 }
 
@@ -216,22 +194,32 @@
   color: var(--color-ink);
 }
 
+/* ------------------------------------------------ editable fields (editor) */
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
+}
+
+.formError {
+  width: 100%;
+  margin-top: var(--space-3);
+  font-size: 0.85rem;
+  color: var(--color-danger);
+  text-align: left;
+}
+
 /* ---------------------------------------------------------- account actions */
 .accountActions {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   margin-top: var(--space-4);
 }
 
-.dangerBtn {
-  font-size: 0.9rem;
-  font-weight: var(--font-weight-medium);
-  color: var(--color-danger);
-}
-
-.dangerBtn:hover {
-  text-decoration: underline;
+/* Log out / delete: keep the thin height but give them a bit more length. */
+.accountActions button {
+  min-width: 150px;
 }
 
 .notice {
@@ -255,6 +243,7 @@
 @media (max-width: 860px) {
   .grid {
     grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .identity {
@@ -263,5 +252,9 @@
 
   .rowLabel {
     width: 120px;
+  }
+
+  .fields {
+    grid-template-columns: 1fr;
   }
 }

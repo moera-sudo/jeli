@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { ROUTES } from '../../Routes/routes'
+import { ROUTES } from '../../Routes/Routes'
 import {
   PlusIcon,
   MinusIcon,

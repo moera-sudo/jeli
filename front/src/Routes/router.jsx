@@ -1,12 +1,12 @@
 import { createBrowserRouter } from 'react-router-dom'
 
-import { ROUTES } from './routes'
+import { ROUTES } from './Routes'
 import RootLayout from './RootLayout'
 import ProtectedRoute from './ProtectedRoute'
 import PublicOnlyRoute from './PublicOnlyRoute'
-import HomePage from '../Pages/HomePage'
-import Profile from '../Pages/Profile'
-import ProfileSetupPage from '../Pages/ProfileSetupPage'
+import HomePage from '../Pages/Home/HomePage'
+import Profile from '../Pages/Profile/Profile'
+import ProfileSetupPage from '../Pages/SetUp/ProfileSetupPage'
 import LoginPage from '../Pages/Auth/LoginPage'
 import RegisterPage from '../Pages/Auth/RegisterPage'
 

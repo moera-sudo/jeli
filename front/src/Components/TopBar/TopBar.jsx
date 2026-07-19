@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-import { ROUTES } from '../../Routes/routes'
+import { ROUTES } from '../../Routes/Routes'
 import { SearchIcon, BellIcon, BookIcon, ChatIcon } from '../../UI/icons'
 import styles from './TopBar.module.css'
 

@@ -1,0 +1,20 @@
+.page {
+  min-height: 100dvh;
+  background: #fafafa;
+}
+
+.main {
+  padding: var(--space-5);
+}
+
+.hint {
+  width: 90%;
+  margin: 0 auto var(--space-4);
+  font-size: 0.95rem;
+  color: var(--color-muted);
+}
+
+.req {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-bold);
+}

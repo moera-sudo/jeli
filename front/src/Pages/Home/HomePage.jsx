@@ -1,8 +1,8 @@
 import { useState } from 'react'
 
-import TopBar from '../Components/TopBar/TopBar'
-import GraphCanvas from '../Components/GraphCanvas/GraphCanvas'
-import HistoryPanel from '../Components/HistoryPanel/HistoryPanel'
+import TopBar from '../../Components/TopBar/TopBar'
+import GraphCanvas from '../../Components/GraphCanvas/GraphCanvas'
+import HistoryPanel from '../../Components/HistoryPanel/HistoryPanel'
 import styles from './HomePage.module.css'
 
 /**

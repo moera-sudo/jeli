@@ -2,7 +2,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
 import Loader from '../UI/Loader/Loader'
-import { ROUTES } from './routes'
+import { ROUTES } from './Routes'
 
 /**
  * Gate for authenticated-only routes.
