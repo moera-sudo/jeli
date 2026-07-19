@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import TextField from '../../UI/TextField/TextField'
 import Button from '../../UI/Button/Button'
 import { CameraIcon } from '../../UI/icons'
+import { splitFullName, joinFullName } from '../../utils/fullName'
 // * Shared profile visuals — same stylesheet as the read-only Profile page,
 // * so the editable form looks exactly like the profile itself.
 import styles from '../../Pages/Profile/Profile.module.css'
@@ -11,41 +12,53 @@ import styles from '../../Pages/Profile/Profile.module.css'
 const GENERAL_FIELDS = [
   { name: 'birth_date', label: 'Дата рождения', type: 'date' },
   { name: 'birth_country', label: 'Страна рождения', placeholder: 'Казахстан' },
-  { name: 'birth_city', label: 'Город рождения', placeholder: 'Алматы' },
+  { name: 'birth_city', label: 'Город рождения', placeholder: 'Ваш город' },
   { name: 'current_country', label: 'Страна проживания', placeholder: 'Казахстан' },
-  { name: 'current_city', label: 'Город проживания', placeholder: 'Алматы' },
+  { name: 'current_city', label: 'Город проживания', placeholder: 'Ваш город' },
 ]
 
 // * Национальность lives with the origin fields (see requirement).
 const ORIGIN_FIELDS = [
   { name: 'nationality', label: 'Национальность', placeholder: 'Казах' },
   { name: 'zhuz', label: 'Жүз', placeholder: 'Старший' },
-  { name: 'tribe', label: 'Тайпа (племя)', placeholder: 'Дулат' },
-  { name: 'ru', label: 'Ру (род)', placeholder: 'Ботбай' },
+  { name: 'tribe', label: 'Тайпа (племя)', placeholder: 'Аргын' },
+  { name: 'ru', label: 'Ру (род)', placeholder: 'Куандык' },
 ]
 
 const FIELD_NAMES = [...GENERAL_FIELDS, ...ORIGIN_FIELDS].map((f) => f.name).concat('description')
 
-/** Initial string state (null/undefined → '') from a user object. */
+/**
+ * Initial string state (null/undefined → '') from a user object.
+ * The single `full_name` is split into CIS parts (surname/first/middle) for
+ * editing.
+ */
 function toFormState(source) {
-  return FIELD_NAMES.concat('full_name').reduce((acc, key) => {
+  const base = FIELD_NAMES.reduce((acc, key) => {
     acc[key] = source?.[key] ?? ''
     return acc
   }, {})
+  return { ...base, ...splitFullName(source?.full_name) }
 }
 
 /**
  * Keeps only non-empty (trimmed) fields for the request.
+ * The three name parts are recombined into a single `full_name` string.
  * `avatar_url` is intentionally omitted — the avatar is a file upload that the
  * backend does not accept yet (layout only).
  */
 function buildPayload(state, includeFullName) {
-  const keys = includeFullName ? FIELD_NAMES.concat('full_name') : FIELD_NAMES
-  return keys.reduce((acc, key) => {
+  const payload = FIELD_NAMES.reduce((acc, key) => {
     const value = String(state[key] ?? '').trim()
     if (value) acc[key] = value
     return acc
   }, {})
+
+  if (includeFullName) {
+    const fullName = joinFullName(state)
+    if (fullName) payload.full_name = fullName
+  }
+
+  return payload
 }
 
 /**
@@ -141,13 +154,29 @@ export default function ProfileEditor({
         </label>
 
         {isEdit ? (
-          <TextField
-            label="ФИО"
-            name="full_name"
-            placeholder="Бекнұр Асанұлы Серіков"
-            value={values.full_name}
-            onChange={setField('full_name')}
-          />
+          <div className={styles.nameFields}>
+            <TextField
+              label="Фамилия"
+              name="surname"
+              placeholder="Серіков"
+              value={values.surname}
+              onChange={setField('surname')}
+            />
+            <TextField
+              label="Имя"
+              name="first_name"
+              placeholder="Бекнұр"
+              value={values.firstName}
+              onChange={setField('firstName')}
+            />
+            <TextField
+              label="Отчество"
+              name="middle_name"
+              placeholder="Асанұлы (необязательно)"
+              value={values.middleName}
+              onChange={setField('middleName')}
+            />
+          </div>
         ) : (
           <h1 className={styles.name}>{initialValues.full_name}</h1>
         )}

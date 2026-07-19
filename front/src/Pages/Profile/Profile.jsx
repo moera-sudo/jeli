@@ -142,7 +142,7 @@ export default function Profile() {
 
               <Card title="Аккаунт">
                 <div className={styles.rows}>
-                  <InfoRow icon={<MailIcon />} label="Эл. почта" value={user.email} />
+                  <InfoRow icon={<MailIcon />} label="E-mail" value={user.email} />
                 </div>
                 <div className={styles.accountActions}>
                   <Button

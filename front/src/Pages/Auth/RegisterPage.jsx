@@ -8,13 +8,17 @@ import { MailIcon, LockIcon, UserIcon, UsersIcon, ArrowRightIcon } from '../../U
 import { ROUTES } from '../../Routes/Routes'
 import { useAuth } from '../../auth/AuthContext'
 import { isValidEmail, isValidPassword, isValidFamilyCode } from '../../utils/validation'
+import { joinFullName } from '../../utils/fullName'
 import styles from './AuthForm.module.css'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
   const { register } = useAuth()
 
-  const [fullName, setFullName] = useState('')
+  // Name in the CIS order: surname · first name · middle name (отчество optional).
+  const [surname, setSurname] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [middleName, setMiddleName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -29,8 +33,11 @@ export default function RegisterPage() {
   const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== password
   const codeInvalid = hasFamily && familyCode.length > 0 && !isValidFamilyCode(familyCode)
 
+  // Surname and first name are mandatory; middle name (отчество) is optional.
+  const nameValid = surname.trim().length > 0 && firstName.trim().length > 0
+
   const canSubmit =
-    fullName.trim().length > 0 &&
+    nameValid &&
     isValidEmail(email) &&
     isValidPassword(password) &&
     confirmPassword === password &&
@@ -49,7 +56,7 @@ export default function RegisterPage() {
     setSubmitting(true)
     try {
       await register({
-        full_name: fullName.trim(),
+        full_name: joinFullName({ surname, firstName, middleName }),
         email: email.trim(),
         password,
         // No code → first family member (assigned the family-admin role).
@@ -71,21 +78,43 @@ export default function RegisterPage() {
     >
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
         <TextField
-          label="ФИО"
+          label="Фамилия"
           type="text"
-          name="full_name"
-          placeholder="Бекнұр Асанұлы Серіков"
-          autoComplete="name"
+          name="surname"
+          placeholder="Серіков"
+          autoComplete="family-name"
           icon={<UserIcon />}
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
+          value={surname}
+          onChange={(e) => setSurname(e.target.value)}
+        />
+
+        <TextField
+          label="Имя"
+          type="text"
+          name="first_name"
+          placeholder="Бекнұр"
+          autoComplete="given-name"
+          icon={<UserIcon />}
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+        />
+
+        <TextField
+          label="Отчество"
+          type="text"
+          name="middle_name"
+          placeholder="Асанұлы (необязательно)"
+          autoComplete="additional-name"
+          icon={<UserIcon />}
+          value={middleName}
+          onChange={(e) => setMiddleName(e.target.value)}
         />
 
         <TextField
           label="Электронная почта"
           type="email"
           name="email"
-          placeholder="адрес эл. почты"
+          placeholder="адрес e-mail"
           autoComplete="email"
           icon={<MailIcon />}
           value={email}
@@ -117,7 +146,6 @@ export default function RegisterPage() {
           error={passwordsMismatch ? 'Пароли не совпадают' : undefined}
         />
 
-        {/* Family-membership prompt, right below the password fields. */}
         <label className={styles.checkboxRow}>
           <input
             type="checkbox"

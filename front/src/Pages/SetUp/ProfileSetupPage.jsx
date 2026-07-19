@@ -18,12 +18,6 @@ const REQUIRED_FIELDS = [
   'nationality',
 ]
 
-/**
- * Onboarding: the blank profile, laid out exactly like the profile and opened
- * straight into edit mode right after registration. Saving is only possible
- * once all required fields are filled; it persists via `users/create`, updates
- * the session user, clears the onboarding flag, then goes to the home page.
- */
 export default function ProfileSetupPage() {
   const navigate = useNavigate()
   const { user, setUser, finishOnboarding } = useAuth()
@@ -31,8 +25,6 @@ export default function ProfileSetupPage() {
   const handleSubmit = async (payload) => {
     const updated = await createProfile(payload)
     setUser(updated)
-    // Clear the pending flag and navigate in the same batch so the route
-    // guard sees onboarding as done and lets the home page through.
     finishOnboarding()
     navigate(ROUTES.home, { replace: true })
   }
