@@ -65,6 +65,8 @@ from src.features.graph.schemas import (
     PersonNode,
 )
 from src.features.graph.utils import generate_invite_code, normalize_name
+from src.features.notifications import service as notifications_service
+from src.features.notifications.constants import NOTIFICATION_TYPE_EXCLUDED_FROM_GRAPH
 from src.features.user.models import User
 
 logger = logging.getLogger(__name__)
@@ -133,7 +135,7 @@ async def _count_parents(db: AsyncSession, person_id: uuid.UUID) -> int:
     return result.scalar_one()
 
 
-async def _get_ancestors_with_depth(db: AsyncSession, person_id: uuid.UUID) -> dict[uuid.UUID, int]:
+async def get_ancestors_with_depth(db: AsyncSession, person_id: uuid.UUID) -> dict[uuid.UUID, int]:
     sql = text(
         """
         WITH RECURSIVE up(id, depth) AS (
@@ -150,7 +152,7 @@ async def _get_ancestors_with_depth(db: AsyncSession, person_id: uuid.UUID) -> d
     return {row.id: row.depth for row in result}
 
 
-async def _get_descendants_with_depth(db: AsyncSession, person_id: uuid.UUID) -> dict[uuid.UUID, int]:
+async def get_descendants_with_depth(db: AsyncSession, person_id: uuid.UUID) -> dict[uuid.UUID, int]:
     sql = text(
         """
         WITH RECURSIVE down(id, depth) AS (
@@ -356,8 +358,8 @@ async def get_graph(db: AsyncSession, focus_person_id: uuid.UUID, depth: int, cu
 async def get_bloodline(db: AsyncSession, person_id: uuid.UUID, current_user: User) -> GraphResponse:
     # * Строго прямая линия (child_of), без супругов — по определению из api-overview.md.
     focus = await get_person_or_404(db, person_id)
-    ancestors = await _get_ancestors_with_depth(db, focus.id)
-    descendants = await _get_descendants_with_depth(db, focus.id)
+    ancestors = await get_ancestors_with_depth(db, focus.id)
+    descendants = await get_descendants_with_depth(db, focus.id)
     generation: dict[uuid.UUID, int] = {focus.id: 0}
     for pid, d in ancestors.items():
         generation[pid] = d
@@ -384,10 +386,10 @@ async def compute_relation_to_viewer(db: AsyncSession, target_person_id: uuid.UU
     # TODO: заменить на словарь родственных терминов (нағашы/аға/іні/жиен), когда дойдут руки.
     if target_person_id == viewer_person_id:
         return "Это вы"
-    ancestors = await _get_ancestors_with_depth(db, viewer_person_id)
+    ancestors = await get_ancestors_with_depth(db, viewer_person_id)
     if target_person_id in ancestors:
         return _format_generation_label("Предок", ancestors[target_person_id])
-    descendants = await _get_descendants_with_depth(db, viewer_person_id)
+    descendants = await get_descendants_with_depth(db, viewer_person_id)
     if target_person_id in descendants:
         return _format_generation_label("Потомок", descendants[target_person_id])
     spouse_result = await db.execute(
@@ -699,9 +701,13 @@ async def delete_person(
     else:
         person.linked_user_id = None
         await db.commit()
-        # ! Плейсхолдер уведомления об исключении из графа — полноценный показ будет в Этапе 6.
-        # TODO(notifications): заменить на реальную отправку через ws_manager/Notification.
-        logger.warning("User %s excluded from graph, person %s unlinked", excluded_user_id, person.id)
+        await notifications_service.create_notification(
+            db,
+            excluded_user_id,
+            NOTIFICATION_TYPE_EXCLUDED_FROM_GRAPH,
+            {"person_id": str(person.id), "person_full_name": person.full_name},
+        )
+        logger.info("User %s excluded from graph, person %s unlinked", excluded_user_id, person.id)
 
 
 async def generate_invite_code_for_person(db: AsyncSession, person: Person, current_user: User) -> str:
@@ -801,7 +807,7 @@ async def create_relationship(db: AsyncSession, current_user: User, from_person_
     if await _count_parents(db, from_person.id) >= MAX_PARENTS_PER_PERSON:
         raise TooManyParentsError()
 
-    descendants = await _get_descendants_with_depth(db, from_person.id)
+    descendants = await get_descendants_with_depth(db, from_person.id)
     if to_person.id in descendants:
         raise CyclicRelationshipError()
 
@@ -1035,7 +1041,11 @@ async def confirm_match(db: AsyncSession, match: MatchCandidate, current_user: U
 
     if match.person_a_confirmed and match.person_b_confirmed and match.confirmed_at is None:
         match.confirmed_at = datetime.now(timezone.utc)
+        # ! Инкремент ПОСЛЕ _link_clusters: _propagate_origin_label делает db.refresh(target) и
+        # ! затирает несохранённые изменения атрибутов target, если их выставить до вызова.
         await _link_clusters(db, person_a, person_b, GRAPH_LINK_TYPE_MATCH_CONFIRMED, source_match_id=match.id)
+        person_a.confirmation_count += 1
+        person_b.confirmation_count += 1
 
     await db.commit()
     await db.refresh(match)

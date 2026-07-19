@@ -4,7 +4,7 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.database import get_db
@@ -29,6 +29,7 @@ from src.features.graph.schemas import (
     RelationshipUpdateRequest,
     SuccessorCandidate,
 )
+from src.features.matching import service as matching_service
 from src.features.user.models import User
 
 logger = logging.getLogger(__name__)
@@ -106,11 +107,13 @@ async def get_successor_candidates(
 )
 async def create_person(
     payload: PersonCreateRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),
 ) -> PersonDetail:
     logger.info("Create person request received by user %s", current_user.id)
     person = await graph_service.create_person(db, current_user, payload)
+    background_tasks.add_task(matching_service.recompute_for_person_task, person.id)
     return await graph_service.get_person_detail(db, person.id, current_user)
 
 
@@ -179,12 +182,14 @@ async def get_person(
 async def update_person(
     id: uuid.UUID,
     payload: PersonUpdateRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),
 ) -> PersonDetail:
     person = await graph_service.get_person_or_404(db, id)
     data = payload.model_dump(exclude_unset=True)
     await graph_service.update_person(db, person, current_user, data)
+    background_tasks.add_task(matching_service.recompute_for_person_task, id)
     return await graph_service.get_person_detail(db, id, current_user)
 
 
@@ -424,7 +429,7 @@ async def reject_marriage_proposal(
     "/persons/{id}/matches",
     response_model=list[MatchCandidateRead],
     summary="Мэтчи по кровной линии узла",
-    description="Пока не работает алгоритм мэтчинга (Этап 4) — всегда возвращает пустой список.",
+    description="Возвращает найденные алгоритмом мэтчинга совпадения с кандидатами из чужих деревьев, отсортированные по score.",
 )
 async def get_person_matches(
     id: uuid.UUID,
@@ -441,7 +446,7 @@ async def get_person_matches(
     summary="Все мэтчи по расширенному графу пользователя",
     description=(
         "Главный эндпоинт для UI: агрегирует мэтчи по всему household-графу пользователя (кровь + "
-        "браки + подтверждённые мэтчи). Пока не работает алгоритм мэтчинга (Этап 4) — пустой список."
+        "браки + подтверждённые мэтчи), найденные алгоритмом мэтчинга."
     ),
 )
 async def get_user_matches(
