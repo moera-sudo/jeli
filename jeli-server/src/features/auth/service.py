@@ -18,6 +18,7 @@ from src.features.auth.constants import (
 )
 from src.features.auth.exceptions import InvalidCredentialsError, InvalidTokenError, UserAlreadyExistsError
 from src.features.auth.schemas import LoginRequest, RegisterRequest, RegisterWithInfoRequest
+from src.features.graph import service as graph_service
 from src.features.user import service as user_service
 from src.features.user.models import User
 from src.features.user.schemas import OptionalProfileFields
@@ -82,6 +83,14 @@ def decode_token(token: str, expected_type: str) -> uuid.UUID:
         raise InvalidTokenError()
 
 
+async def _try_link_invite_code(db: AsyncSession, user: User, graph_invite_code: str | None) -> None:
+    # * Best-effort: если передан код приглашения — пробуем привязать существующий узел.
+    # * Дерево при регистрации больше НЕ создаётся автоматически (см. POST /graph/create, /graph/join) —
+    # * если код невалиден/уже занят, просто ничего не происходит, без ошибки.
+    if graph_invite_code:
+        await graph_service.link_existing_person_by_invite_code(db, user, graph_invite_code)
+
+
 async def register(db: AsyncSession, data: RegisterRequest) -> tuple[User, str, str]:
     existing = await user_service.get_by_email(db, data.email)
     if existing is not None:
@@ -95,6 +104,7 @@ async def register(db: AsyncSession, data: RegisterRequest) -> tuple[User, str, 
         full_name=data.full_name,
         graph_invite_code=data.graph_invite_code,
     )
+    await _try_link_invite_code(db, user, data.graph_invite_code)
     access_token, refresh_token = create_token_pair(user.id)
     logger.info("User registered: %s", user.id)
     return user, access_token, refresh_token
@@ -120,6 +130,7 @@ async def register_with_info(db: AsyncSession, data: RegisterWithInfoRequest) ->
         await db.commit()
         await db.refresh(user)
 
+    await _try_link_invite_code(db, user, data.graph_invite_code)
     access_token, refresh_token = create_token_pair(user.id)
     logger.info("User registered with full profile info: %s", user.id)
     return user, access_token, refresh_token

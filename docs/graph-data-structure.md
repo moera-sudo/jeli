@@ -56,10 +56,6 @@ GET /graph?focus={person_id}&depth=3
 
 ## Эндпоинт 2 — карточка
 
-```
-GET /persons/{id}
-```
-
 Возвращает то же самое **плюс всё тяжёлое**: `birth_country`, `birth_region`, `ru` / `tribe` / `zhuz`, `ethnic_source`, `source_type`, `attachments[]`, `confirmation_count`, `death_context`, точности дат.
 
 Плюс три вычисляемых поля:

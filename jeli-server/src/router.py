@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter
 
 from src.features.auth.router import router as AuthRouter
+from src.features.graph.router import router as GraphRouter
 from src.features.user.router import router as UserRouter
 
 logger = logging.getLogger(__name__)
@@ -20,11 +21,10 @@ async def health_check() -> dict[str, str]:
 
 router.include_router(AuthRouter)
 router.include_router(UserRouter)
+router.include_router(GraphRouter)
 
 # TODO: подключить по мере реализации остальных фич
-# from src.features.graph.router import router as GraphRouter
 # from src.features.messenger.router import router as MessengerRouter
 # from src.features.notifications.router import router as NotificationsRouter
-# router.include_router(GraphRouter)
 # router.include_router(MessengerRouter)
 # router.include_router(NotificationsRouter)

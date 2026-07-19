@@ -1,0 +1,17 @@
+info:
+  name: Confirm
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: http://localhost:8000/api/marriage-proposals/66666666-6666-6666-6666-666666666666/confirm
+  auth:
+    type: bearer
+    token: PASTE_ACCESS_TOKEN_HERE
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -2,13 +2,17 @@
 # частичное обновление профиля. Переиспользуются фичей auth для ответов на регистрацию/логин.
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr
+
+Gender = Literal["male", "female"]
 
 
 class OptionalProfileFields(BaseModel):
     # * Общие необязательные поля профиля — переиспользуются в auth.RegisterWithInfoRequest,
     # * user.ProfileUpdateRequest и user.ProfileCreateRequest.
+    gender: Gender | None = None
     current_city: str | None = None
     current_country: str | None = None
     birth_date: date | None = None
@@ -29,6 +33,7 @@ class UserMe(BaseModel):
     email: EmailStr
     full_name: str
     avatar_url: str
+    gender: Gender | None
     current_city: str | None
     current_country: str | None
     birth_date: date | None
@@ -51,6 +56,7 @@ class UserPublic(BaseModel):
     id: uuid.UUID
     full_name: str
     avatar_url: str
+    gender: Gender | None
     current_city: str | None
     current_country: str | None
     birth_date: date | None

@@ -1,0 +1,17 @@
+info:
+  name: Delete
+  type: http
+  seq: 6
+
+http:
+  method: DELETE
+  url: http://localhost:8000/api/persons/11111111-1111-1111-1111-111111111111?new_owner_user_id=88888888-8888-8888-8888-888888888888
+  auth:
+    type: bearer
+    token: PASTE_ACCESS_TOKEN_HERE
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
