@@ -1,16 +1,23 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
 import TopBar from '../Components/TopBar/TopBar'
+import ProfileForm from '../Components/ProfileForm/ProfileForm'
 import Button from '../UI/Button/Button'
+import Loader from '../UI/Loader/Loader'
 import {
   EditIcon,
-  PhoneIcon,
   MailIcon,
   ChatIcon,
   CalendarIcon,
   LocationIcon,
   GlobeIcon,
   UsersIcon,
-  LockIcon,
 } from '../UI/icons'
+import { getMyProfile, updateProfile } from '../api/profileService'
+import { useAuth } from '../auth/AuthContext'
+import { ROUTES } from '../Routes/routes'
+import { formatDate, displayValue } from '../utils/format'
 import styles from './Profile.module.css'
 
 /** A label → value row used across the info cards. */
@@ -25,14 +32,14 @@ function InfoRow({ icon, label, value }) {
 }
 
 /** Card wrapper with a title and an optional edit affordance. */
-function Card({ title, editable, children, className }) {
+function Card({ title, onEdit, children, className }) {
   return (
     <section className={[styles.card, className].filter(Boolean).join(' ')}>
       {title && (
         <header className={styles.cardHead}>
           <h2 className={styles.cardTitle}>{title}</h2>
-          {editable && (
-            <button type="button" className={styles.editBtn} aria-label="Редактировать">
+          {onEdit && (
+            <button type="button" className={styles.editBtn} aria-label="Редактировать" onClick={onEdit}>
               <EditIcon />
             </button>
           )}
@@ -43,45 +50,77 @@ function Card({ title, editable, children, className }) {
   )
 }
 
-/**
- * User profile — layout only.
- * A profile column beside stacked information cards, matching the reference
- * mockup and the app's black / white / orange system.
- */
+/** Builds the origin subtitle (e.g. "Старший жүз · Дулат · Ботбай"). */
+function originLine(user) {
+  return [user.zhuz && `${user.zhuz} жүз`, user.tribe, user.ru].filter(Boolean).join(' · ')
+}
+
 export default function Profile() {
+  const navigate = useNavigate()
+  const { user, setUser, logout } = useAuth()
+
+  const [editing, setEditing] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [deleteNotice, setDeleteNotice] = useState('')
+
+  // Always refresh from the server when opening the profile.
+  useEffect(() => {
+    let active = true
+    getMyProfile()
+      .then((me) => active && setUser(me))
+      .catch((err) => active && setLoadError(err.message || 'Не удалось загрузить профиль'))
+    return () => {
+      active = false
+    }
+    // setUser is stable (useCallback); run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  if (!user) return <Loader />
+
+  const handleSave = async (payload) => {
+    const updated = await updateProfile(payload)
+    setUser(updated)
+    setEditing(false)
+  }
+
+  const handleDelete = () => {
+    // No backend endpoint yet — surface an honest notice instead of failing.
+    setDeleteNotice('Удаление аккаунта пока недоступно.')
+  }
+
+  const origin = originLine(user)
+
   return (
     <div className={styles.page}>
       <TopBar />
 
       <main className={styles.main}>
+        {loadError && <p className={styles.loadError} role="alert">{loadError}</p>}
+
         <div className={styles.grid}>
           {/* ---------------------------------------------------- profile column */}
           <Card className={styles.identity}>
             <div className={styles.avatarWrap}>
-              <img
-                className={styles.avatar}
-                src="https://i.pravatar.cc/240?img=12"
-                alt="Аватар пользователя"
-              />
-              <button type="button" className={styles.avatarEdit} aria-label="Сменить аватар">
-                <EditIcon />
-              </button>
+              <img className={styles.avatar} src={user.avatar_url} alt="Аватар пользователя" />
             </div>
 
-            <h1 className={styles.name}>Бекнұр Асанұлы Серіков</h1>
-            <p className={styles.handle}>Старший жүз · Дулат · Ботбай</p>
+            <h1 className={styles.name}>{user.full_name}</h1>
+            {origin && <p className={styles.handle}>{origin}</p>}
 
             <div className={styles.contacts}>
-              <a className={styles.contact} href="tel:+77010000000">
-                <PhoneIcon /> +7 (701) 000-00-00
-              </a>
-              <a className={styles.contact} href="mailto:beknur@example.com">
-                <MailIcon /> beknur@example.com
+              <a className={styles.contact} href={`mailto:${user.email}`}>
+                <MailIcon /> {user.email}
               </a>
             </div>
 
             <div className={styles.identityActions}>
-              <Button variant="accent" fullWidth trailingIcon={<ChatIcon />}>
+              {!editing && (
+                <Button variant="accent" fullWidth trailingIcon={<EditIcon />} onClick={() => setEditing(true)}>
+                  Редактировать профиль
+                </Button>
+              )}
+              <Button variant="primary" fullWidth trailingIcon={<ChatIcon />}>
                 Открыть чат рода
               </Button>
             </div>
@@ -89,42 +128,60 @@ export default function Profile() {
 
           {/* ------------------------------------------------------- info column */}
           <div className={styles.info}>
-            <Card title="Общая информация" editable>
-              <div className={styles.rows}>
-                <InfoRow icon={<CalendarIcon />} label="Дата рождения" value="23 июля 1994" />
-                <InfoRow icon={<LocationIcon />} label="Место рождения" value="г. Алматы, Казахстан" />
-                <InfoRow icon={<LocationIcon />} label="Город" value="Алматы" />
-                <InfoRow icon={<GlobeIcon />} label="Страна" value="Казахстан" />
-                <InfoRow icon={<GlobeIcon />} label="Национальность" value="Казах" />
-              </div>
-            </Card>
+            {editing ? (
+              <Card title="Редактирование профиля">
+                <ProfileForm
+                  initialValues={user}
+                  includeFullName
+                  submitLabel="Сохранить изменения"
+                  onSubmit={handleSave}
+                  onCancel={() => setEditing(false)}
+                />
+              </Card>
+            ) : (
+              <>
+                <Card title="Общая информация" onEdit={() => setEditing(true)}>
+                  <div className={styles.rows}>
+                    <InfoRow icon={<CalendarIcon />} label="Дата рождения" value={formatDate(user.birth_date)} />
+                    <InfoRow
+                      icon={<LocationIcon />}
+                      label="Место рождения"
+                      value={displayValue([user.birth_city, user.birth_country].filter(Boolean).join(', '))}
+                    />
+                    <InfoRow icon={<LocationIcon />} label="Город" value={displayValue(user.current_city)} />
+                    <InfoRow icon={<GlobeIcon />} label="Страна" value={displayValue(user.current_country)} />
+                    <InfoRow icon={<GlobeIcon />} label="Национальность" value={displayValue(user.nationality)} />
+                  </div>
+                </Card>
 
-            <Card title="Происхождение" editable>
-              <div className={styles.rows}>
-                <InfoRow icon={<UsersIcon />} label="Жүз" value="Старший (Ұлы жүз)" />
-                <InfoRow icon={<UsersIcon />} label="Племя (тайпа)" value="Дулат" />
-                <InfoRow icon={<UsersIcon />} label="Род (ру)" value="Ботбай" />
-              </div>
-            </Card>
+                <Card title="Происхождение" onEdit={() => setEditing(true)}>
+                  <div className={styles.rows}>
+                    <InfoRow icon={<UsersIcon />} label="Жүз" value={displayValue(user.zhuz)} />
+                    <InfoRow icon={<UsersIcon />} label="Тайпа (племя)" value={displayValue(user.tribe)} />
+                    <InfoRow icon={<UsersIcon />} label="Ру (род)" value={displayValue(user.ru)} />
+                  </div>
+                </Card>
 
-            <Card title="О себе" editable>
-              <p className={styles.about}>
-                Собираю родословную семьи по обеим линиям. Ищу потомков рода Ботбай
-                и рад связаться с родственниками по Старшему жузу.
-              </p>
-            </Card>
+                <Card title="О себе" onEdit={() => setEditing(true)}>
+                  <p className={styles.about}>{displayValue(user.description, 'Пока ничего не рассказано.')}</p>
+                </Card>
 
-            <Card title="Аккаунт" editable>
-              <div className={styles.rows}>
-                <InfoRow icon={<MailIcon />} label="Эл. почта" value="beknur@example.com" />
-                <div className={styles.row}>
-                  <span className={styles.rowIcon} aria-hidden="true"><LockIcon /></span>
-                  <span className={styles.rowLabel}>Пароль</span>
-                  <span className={styles.rowValue}>••••••••••</span>
-                  <button type="button" className={styles.rowAction}>Изменить</button>
-                </div>
-              </div>
-            </Card>
+                <Card title="Аккаунт">
+                  <div className={styles.rows}>
+                    <InfoRow icon={<MailIcon />} label="Эл. почта" value={user.email} />
+                  </div>
+                  <div className={styles.accountActions}>
+                    <Button variant="primary" onClick={() => { logout(); navigate(ROUTES.login, { replace: true }) }}>
+                      Выйти
+                    </Button>
+                    <button type="button" className={styles.dangerBtn} onClick={handleDelete}>
+                      Удалить аккаунт
+                    </button>
+                  </div>
+                  {deleteNotice && <p className={styles.notice} role="alert">{deleteNotice}</p>}
+                </Card>
+              </>
+            )}
           </div>
         </div>
       </main>

@@ -6,22 +6,36 @@ import TextField from '../../UI/TextField/TextField'
 import Button from '../../UI/Button/Button'
 import { MailIcon, LockIcon, ArrowRightIcon } from '../../UI/icons'
 import { ROUTES } from '../../Routes/routes'
+import { useAuth } from '../../auth/AuthContext'
 import { isValidEmail } from '../../utils/validation'
 import styles from './AuthForm.module.css'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const { login } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
 
   // Email is validated live once the field has content.
   const emailInvalid = email.length > 0 && !isValidEmail(email)
+  const canSubmit = isValidEmail(email) && password.length > 0 && !submitting
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    if (emailInvalid) return
-    navigate(ROUTES.home)
+    if (!canSubmit) return
+
+    setFormError('')
+    setSubmitting(true)
+    try {
+      await login({ email: email.trim(), password })
+      navigate(ROUTES.home, { replace: true })
+    } catch (err) {
+      setFormError(err.message || 'Не удалось войти')
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -53,14 +67,20 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
+        {formError && (
+          <p className={styles.formError} role="alert">
+            {formError}
+          </p>
+        )}
+
         <div className={styles.actions}>
           <Button
             type="submit"
             fullWidth
             trailingIcon={<ArrowRightIcon />}
-            disabled={emailInvalid}
+            disabled={!canSubmit}
           >
-            Войти
+            {submitting ? 'Вход…' : 'Войти'}
           </Button>
         </div>
       </form>
