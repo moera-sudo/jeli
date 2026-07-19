@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import TextField from '../../UI/TextField/TextField'
+import NameFields from '../NameFields/NameFields'
 import Button from '../../UI/Button/Button'
 import { CameraIcon } from '../../UI/icons'
 import { splitFullName, joinFullName } from '../../utils/fullName'
@@ -92,6 +93,9 @@ export default function ProfileEditor({
   const setField = (name) => (event) =>
     setValues((prev) => ({ ...prev, [name]: event.target.value }))
 
+  const handleNameChange = (field, value) =>
+    setValues((prev) => ({ ...prev, [field]: value }))
+
   // Local-only preview; the file is not uploaded (backend not ready).
   const handleAvatarChange = (event) => {
     const file = event.target.files?.[0]
@@ -153,33 +157,9 @@ export default function ProfileEditor({
           </span>
         </label>
 
-        {isEdit ? (
-          <div className={styles.nameFields}>
-            <TextField
-              label="Фамилия"
-              name="surname"
-              placeholder="Серіков"
-              value={values.surname}
-              onChange={setField('surname')}
-            />
-            <TextField
-              label="Имя"
-              name="first_name"
-              placeholder="Бекнұр"
-              value={values.firstName}
-              onChange={setField('firstName')}
-            />
-            <TextField
-              label="Отчество"
-              name="middle_name"
-              placeholder="Асанұлы (необязательно)"
-              value={values.middleName}
-              onChange={setField('middleName')}
-            />
-          </div>
-        ) : (
-          <h1 className={styles.name}>{initialValues.full_name}</h1>
-        )}
+        <h1 className={styles.name}>
+          {isEdit ? joinFullName(values) || 'Ваше имя' : initialValues.full_name}
+        </h1>
 
         {error && <p className={styles.formError} role="alert">{error}</p>}
 
@@ -197,6 +177,15 @@ export default function ProfileEditor({
 
       {/* ------------------------------------------------------- info column */}
       <div className={styles.info}>
+        {isEdit && (
+          <section className={styles.card}>
+            <header className={styles.cardHead}>
+              <h2 className={styles.cardTitle}>ФИО</h2>
+            </header>
+            <NameFields values={values} onChange={handleNameChange} layout="grid" />
+          </section>
+        )}
+
         <section className={styles.card}>
           <header className={styles.cardHead}>
             <h2 className={styles.cardTitle}>Общая информация</h2>

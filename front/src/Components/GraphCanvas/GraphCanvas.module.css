@@ -364,6 +364,11 @@
   background: #f4f4f5;
 }
 
+.control:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .control svg {
   width: 20px;
   height: 20px;
@@ -395,6 +400,15 @@
   animation: cardIn 0.12s ease;
 }
 
+.exportHint {
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .exportMenu button {
   padding: var(--space-2) var(--space-3);
   text-align: left;
@@ -422,6 +436,13 @@
   background: var(--color-base);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.zoomBadgeVisible {
+  opacity: 1;
 }
 
 /* --------------------------------------------------------------- load more */

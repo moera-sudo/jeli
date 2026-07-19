@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import AuthLayout from '../../Components/AuthLayout/AuthLayout'
+import NameFields from '../../Components/NameFields/NameFields'
 import TextField from '../../UI/TextField/TextField'
 import Button from '../../UI/Button/Button'
-import { MailIcon, LockIcon, UserIcon, UsersIcon, ArrowRightIcon } from '../../UI/icons'
+import { MailIcon, LockIcon, UsersIcon, ArrowRightIcon } from '../../UI/icons'
 import { ROUTES } from '../../Routes/Routes'
 import { useAuth } from '../../auth/AuthContext'
 import { isValidEmail, isValidPassword, isValidFamilyCode } from '../../utils/validation'
@@ -16,9 +17,7 @@ export default function RegisterPage() {
   const { register } = useAuth()
 
   // Name in the CIS order: surname · first name · middle name (отчество optional).
-  const [surname, setSurname] = useState('')
-  const [firstName, setFirstName] = useState('')
-  const [middleName, setMiddleName] = useState('')
+  const [name, setName] = useState({ surname: '', firstName: '', middleName: '' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -34,7 +33,9 @@ export default function RegisterPage() {
   const codeInvalid = hasFamily && familyCode.length > 0 && !isValidFamilyCode(familyCode)
 
   // Surname and first name are mandatory; middle name (отчество) is optional.
-  const nameValid = surname.trim().length > 0 && firstName.trim().length > 0
+  const nameValid = name.surname.trim().length > 0 && name.firstName.trim().length > 0
+
+  const handleNameChange = (field, value) => setName((prev) => ({ ...prev, [field]: value }))
 
   const canSubmit =
     nameValid &&
@@ -56,7 +57,7 @@ export default function RegisterPage() {
     setSubmitting(true)
     try {
       await register({
-        full_name: joinFullName({ surname, firstName, middleName }),
+        full_name: joinFullName(name),
         email: email.trim(),
         password,
         // No code → first family member (assigned the family-admin role).
@@ -77,38 +78,7 @@ export default function RegisterPage() {
       switchTo={{ hint: 'Уже есть аккаунт?', label: 'Войти', to: ROUTES.login }}
     >
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
-        <TextField
-          label="Фамилия"
-          type="text"
-          name="surname"
-          placeholder="Серіков"
-          autoComplete="family-name"
-          icon={<UserIcon />}
-          value={surname}
-          onChange={(e) => setSurname(e.target.value)}
-        />
-
-        <TextField
-          label="Имя"
-          type="text"
-          name="first_name"
-          placeholder="Бекнұр"
-          autoComplete="given-name"
-          icon={<UserIcon />}
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
-        />
-
-        <TextField
-          label="Отчество"
-          type="text"
-          name="middle_name"
-          placeholder="Асанұлы (необязательно)"
-          autoComplete="additional-name"
-          icon={<UserIcon />}
-          value={middleName}
-          onChange={(e) => setMiddleName(e.target.value)}
-        />
+        <NameFields values={name} onChange={handleNameChange} withIcons />
 
         <TextField
           label="Электронная почта"

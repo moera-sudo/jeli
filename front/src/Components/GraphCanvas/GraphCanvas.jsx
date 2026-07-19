@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { ROUTES } from '../../Routes/Routes'
+import { downloadSvgAsImage } from '../../utils/exportImage'
 import {
   PlusIcon,
   MinusIcon,
-  FitViewIcon,
   UserIcon,
   UsersIcon,
   ChatIcon,
@@ -87,7 +87,10 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-function buildSvg() {
+// * PNG exports transparent and without the heading; JPEG keeps the white
+// * background and "Родовое древо" title.
+function buildSvg(format) {
+  const bare = format === 'png'
   const W = 840
   const H = 500
   const edges = EDGE_PATHS.map((d) => `<path d="${d}" fill="none" stroke="rgba(26,26,26,0.28)" stroke-width="2"/>`).join('')
@@ -115,36 +118,16 @@ function buildSvg() {
       </g>`
   }).join('')
 
+  const background = bare ? '' : `<rect width="${W}" height="${H}" fill="#ffffff"/>`
+  const heading = bare
+    ? ''
+    : `<text x="24" y="34" font-family="sans-serif" font-size="16" font-weight="700" fill="#1a1a1a">Родовое древо</text>`
+
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-    <rect width="${W}" height="${H}" fill="#ffffff"/>
-    <text x="24" y="34" font-family="sans-serif" font-size="16" font-weight="700" fill="#1a1a1a">Родовое древо</text>
+    ${background}
+    ${heading}
     <g transform="translate(0,10)">${edges}${unions}${cards}</g>
   </svg>`
-}
-
-function exportGraph(format) {
-  const svg = buildSvg()
-  const scale = 2
-  const img = new Image()
-  img.onload = () => {
-    const canvas = document.createElement('canvas')
-    canvas.width = img.width * scale
-    canvas.height = img.height * scale
-    const ctx = canvas.getContext('2d')
-    if (format === 'jpeg') {
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-    }
-    ctx.scale(scale, scale)
-    ctx.drawImage(img, 0, 0)
-    const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png'
-    const url = canvas.toDataURL(mime, 0.92)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `family-tree.${format === 'jpeg' ? 'jpg' : 'png'}`
-    a.click()
-  }
-  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
 /* ============================================================ component === */
@@ -157,9 +140,37 @@ export default function GraphCanvas() {
   const [hovered, setHovered] = useState(null) // { node, left, top }
   const [menu, setMenu] = useState(null) // { node, left, top }
   const [exportOpen, setExportOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [zoomVisible, setZoomVisible] = useState(false)
+  const firstZoomRender = useRef(true)
 
   const zoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2)))
   const zoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, +(z - ZOOM_STEP).toFixed(2)))
+
+  // Reveal the zoom readout only while the user is changing the zoom; fade it
+  // back out after a short idle. Skips the initial render so it stays hidden
+  // until the first zoom action.
+  useEffect(() => {
+    if (firstZoomRender.current) {
+      firstZoomRender.current = false
+      return
+    }
+    setZoomVisible(true)
+    const timer = setTimeout(() => setZoomVisible(false), 1200)
+    return () => clearTimeout(timer)
+  }, [zoom])
+
+  // Rasterise + download the whole tree without blocking the UI thread, so the
+  // user can keep interacting while the file is prepared and saved.
+  const handleExport = useCallback(async (format) => {
+    setExportOpen(false)
+    setExporting(true)
+    try {
+      await downloadSvgAsImage(buildSvg(format), { format, fileName: 'family-tree' })
+    } finally {
+      setExporting(false)
+    }
+  }, [])
 
   const toggleFullscreen = () => {
     const el = canvasRef.current
@@ -331,22 +342,26 @@ export default function GraphCanvas() {
             type="button"
             className={`${styles.control} ${exportOpen ? styles.controlActive : ''}`}
             onClick={() => setExportOpen((v) => !v)}
-            aria-label="Экспорт"
+            disabled={exporting}
+            aria-label="Экспорт древа"
             aria-expanded={exportOpen}
           >
             <DownloadIcon />
           </button>
           {exportOpen && (
-            <div className={styles.exportMenu}>
-              <button type="button" onClick={() => { exportGraph('png'); setExportOpen(false) }}>PNG</button>
-              <button type="button" onClick={() => { exportGraph('jpeg'); setExportOpen(false) }}>JPEG</button>
+            <div className={styles.exportMenu} role="menu">
+              <span className={styles.exportHint}>Скачать как</span>
+              <button type="button" role="menuitem" onClick={() => handleExport('png')}>PNG</button>
+              <button type="button" role="menuitem" onClick={() => handleExport('jpeg')}>JPEG</button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Zoom readout. */}
-      <span className={styles.zoomBadge}>{Math.round(zoom * 100)}%</span>
+      {/* Zoom readout — visible only while zooming. */}
+      <span className={`${styles.zoomBadge} ${zoomVisible ? styles.zoomBadgeVisible : ''}`} aria-hidden={!zoomVisible}>
+        {Math.round(zoom * 100)}%
+      </span>
 
       {/* Load-more generations. */}
       <button type="button" className={styles.loadMore}>
