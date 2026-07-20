@@ -27,6 +27,8 @@
   margin-right: var(--space-3);
 }
 
+.searchIcon svg { width: 100%; height: 100%; }
+
 .searchIcon {
   position: absolute;
   left: var(--space-4);

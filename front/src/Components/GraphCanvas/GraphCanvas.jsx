@@ -12,7 +12,7 @@ import MarriageModal from './MarriageModal'
 import RelationshipEdgeModal from './RelationshipEdgeModal'
 import Button from '../../UI/Button/Button'
 import Loader from '../../UI/Loader/Loader'
-import { DownloadIcon, CloseIcon, CheckIcon, PlusIcon, MinusIcon } from '../../UI/icons'
+import { DownloadIcon, CloseIcon, CheckIcon, PlusIcon, MinusIcon, FullscreenIcon } from '../../UI/icons'
 import { downloadSvgAsImage } from '../../utils/exportImage'
 import { buildFlow, NODE_SIZE, UNION_SIZE } from '../../utils/buildFlow'
 import { formatPersonName } from '../../utils/fullName'
@@ -120,15 +120,6 @@ function buildSvg(nodes, edges, format) {
 }
 
 /* ==================================================== controls cluster === */
-/** Fullscreen toggle glyph (kept local to keep the shared icon set lean). */
-function FullscreenIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
-      <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 /**
  * Bottom-left controls: zoom in, zoom out, fullscreen, export — in that order.
  * The zoom percentage flashes briefly whenever the zoom changes.
