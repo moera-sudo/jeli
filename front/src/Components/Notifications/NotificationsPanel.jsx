@@ -1,9 +1,11 @@
-import { CloseIcon, CheckIcon, UsersIcon, ChatIcon, BellIcon, UserIcon } from '../../UI/icons'
+import { CloseIcon, UsersIcon, ChatIcon, BellIcon, UserIcon } from '../../UI/icons'
 import styles from './NotificationsPanel.module.css'
 
 /**
  * Notifications modal — a tall panel that slides in from the right edge.
- * Layout only: the items are static sample data and no actions are wired.
+ * Opening the panel counts as reading everything (the header handles the
+ * "seen" state), so items are shown without an unread treatment.
+ * Layout only: the items are static sample data.
  *
  * @param {object}     props
  * @param {boolean}    props.open     Whether the panel is shown.
@@ -18,7 +20,6 @@ const NOTIFICATIONS = [
     title: 'Найден возможный родственник',
     text: 'Динара Ахметова совпадает с вашим древом по роду Ботбай.',
     time: '5 мин назад',
-    unread: true,
   },
   {
     id: 2,
@@ -27,7 +28,6 @@ const NOTIFICATIONS = [
     title: 'Новое сообщение',
     text: 'Ерлан: «Ассалаумағалейкум, нашёл общего предка!»',
     time: '20 мин назад',
-    unread: true,
   },
   {
     id: 3,
@@ -36,7 +36,6 @@ const NOTIFICATIONS = [
     title: 'Приглашение принято',
     text: 'Асель Серікова присоединилась к вашему древу.',
     time: '2 ч назад',
-    unread: false,
   },
   {
     id: 4,
@@ -45,7 +44,6 @@ const NOTIFICATIONS = [
     title: 'Древо обновлено',
     text: 'Добавлено новое поколение — 3 родственника.',
     time: 'Вчера',
-    unread: false,
   },
 ]
 
@@ -66,24 +64,16 @@ export default function NotificationsPanel({ open, onClose }) {
       >
         {/* ------------------------------------------------------------- head */}
         <header className={styles.head}>
-          <div className={styles.heading}>
-            <h2 className={styles.title}>Уведомления</h2>
-            <span className={styles.subtitle}>2 новых</span>
-          </div>
-          <div className={styles.headActions}>
-            <button type="button" className={styles.markAll}>
-              <CheckIcon /> Прочитать все
-            </button>
-            <button type="button" className={styles.close} aria-label="Закрыть" onClick={onClose}>
-              <CloseIcon />
-            </button>
-          </div>
+          <h2 className={styles.title}>Уведомления</h2>
+          <button type="button" className={styles.close} aria-label="Закрыть" onClick={onClose}>
+            <CloseIcon />
+          </button>
         </header>
 
         {/* ------------------------------------------------------------ items */}
         <ul className={styles.list}>
           {NOTIFICATIONS.map((n) => (
-            <li key={n.id} className={`${styles.item} ${n.unread ? styles.itemUnread : ''}`}>
+            <li key={n.id} className={styles.item}>
               <span className={`${styles.itemIcon} ${styles[n.tone]}`} aria-hidden="true">
                 {n.icon}
               </span>
@@ -92,7 +82,6 @@ export default function NotificationsPanel({ open, onClose }) {
                 <p className={styles.itemText}>{n.text}</p>
                 <span className={styles.itemTime}>{n.time}</span>
               </div>
-              {n.unread && <span className={styles.unreadDot} aria-hidden="true" />}
             </li>
           ))}
         </ul>

@@ -1,25 +1,21 @@
 .page {
-  min-height: 100dvh;
-  background: #fafafa;
-}
-
-.main {
-  padding: var(--space-5);
-}
-
-.card {
-  max-width: 720px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
   background: var(--color-base);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-  overflow: hidden;
+}
+
+/* Full-bleed: the chat list fills the whole area below the header. */
+.main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* -------------------------------------------------------------------- head */
 .head {
-  padding: var(--space-5) var(--space-5) var(--space-4);
+  padding: var(--space-5) var(--space-6) var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -37,13 +33,14 @@
 /* ------------------------------------------------------------------ search */
 .search {
   position: relative;
-  padding: var(--space-4) var(--space-5) 0;
+  padding: var(--space-4) var(--space-6) 0;
 }
 
 .searchIcon {
   position: absolute;
-  left: calc(var(--space-5) + var(--space-4));
-  top: 50%;
+  left: calc(var(--space-6) + var(--space-4));
+  /* Centre on the 44px input, not the box (which has a space-4 top padding). */
+  top: calc(var(--space-4) + 22px);
   transform: translateY(-50%);
   width: 18px;
   height: 18px;
@@ -75,15 +72,18 @@
 
 /* -------------------------------------------------------------------- list */
 .list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   list-style: none;
-  padding: var(--space-3) 0 var(--space-2);
+  padding: var(--space-3) 0;
 }
 
 .row {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-6);
   transition: background 0.15s ease;
 }
 
@@ -91,27 +91,12 @@
   background: #fafafa;
 }
 
-.avatarWrap {
-  position: relative;
-  flex-shrink: 0;
-}
-
 .avatar {
+  flex-shrink: 0;
   width: 52px;
   height: 52px;
   border-radius: var(--radius-pill);
   object-fit: cover;
-}
-
-.online {
-  position: absolute;
-  right: 1px;
-  bottom: 1px;
-  width: 13px;
-  height: 13px;
-  background: #22c55e;
-  border: 2px solid var(--color-base);
-  border-radius: var(--radius-pill);
 }
 
 .body {

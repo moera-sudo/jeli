@@ -38,7 +38,7 @@
 /* -------------------------------------------------------------------- head */
 .head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-5);
@@ -48,43 +48,6 @@
 .title {
   font-size: 1.2rem;
   font-weight: var(--font-weight-bold);
-}
-
-.subtitle {
-  display: block;
-  margin-top: 2px;
-  font-size: 0.78rem;
-  color: var(--color-accent);
-  font-weight: var(--font-weight-medium);
-}
-
-.headActions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-shrink: 0;
-}
-
-.markAll {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  font-size: 0.78rem;
-  font-weight: var(--font-weight-medium);
-  color: var(--color-muted);
-  border-radius: var(--radius-sm);
-  transition: color 0.2s ease, background 0.2s ease;
-}
-
-.markAll:hover {
-  color: var(--color-accent);
-  background: rgba(255, 118, 72, 0.1);
-}
-
-.markAll svg {
-  width: 15px;
-  height: 15px;
 }
 
 .close {
@@ -129,10 +92,6 @@
 
 .item:hover {
   background: #fafafa;
-}
-
-.itemUnread {
-  background: rgba(255, 118, 72, 0.05);
 }
 
 .itemIcon {
@@ -196,13 +155,4 @@
   margin-top: var(--space-2);
   font-size: 0.72rem;
   color: var(--color-muted);
-}
-
-.unreadDot {
-  flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  margin-top: var(--space-2);
-  background: var(--color-accent);
-  border-radius: var(--radius-pill);
 }

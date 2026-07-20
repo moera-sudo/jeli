@@ -9,7 +9,7 @@ import styles from './ChatPage.module.css'
  * Conversation page. Layout only: static message history and a composer that
  * is presentational (submitting does nothing yet).
  */
-const PEER = { name: 'Ерлан Серіков', avatar: 'https://i.pravatar.cc/96?img=12', status: 'в сети' }
+const PEER = { name: 'Ерлан Серіков', avatar: 'https://i.pravatar.cc/96?img=12' }
 
 const MESSAGES = [
   { id: 1, from: 'them', text: 'Ассалаумағалейкум! Я нашёл нас в общем древе 🌳', time: '12:31' },
@@ -32,10 +32,7 @@ export default function ChatPage() {
               <ArrowLeftIcon />
             </Link>
             <img className={styles.headAvatar} src={PEER.avatar} alt="" />
-            <div className={styles.headInfo}>
-              <span className={styles.headName}>{PEER.name}</span>
-              <span className={styles.headStatus}>{PEER.status}</span>
-            </div>
+            <span className={styles.headName}>{PEER.name}</span>
           </header>
 
           {/* ------------------------------------------------------ messages */}

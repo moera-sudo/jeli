@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { ROUTES } from '../../Routes/Routes'
 import { SearchIcon, BellIcon, BookIcon, ChatIcon } from '../../UI/icons'
 import NotificationsPanel from '../Notifications/NotificationsPanel'
+import logo from '../../assets/logo_2.png'
 import styles from './TopBar.module.css'
 
 /**
@@ -24,11 +25,19 @@ export default function TopBar({
   onToggleHistory,
 }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  // Opening the panel marks everything as read → the unread dot clears.
+  const [notificationsSeen, setNotificationsSeen] = useState(false)
+
+  const toggleNotifications = () =>
+    setNotificationsOpen((open) => {
+      if (!open) setNotificationsSeen(true)
+      return !open
+    })
 
   return (
     <header className={styles.bar}>
       <Link to={ROUTES.home} aria-label="На главную">
-        <img src="src/assets/logo_2.png" alt="" className={styles.logo} />
+        <img src={logo} alt="" className={styles.logo} />
       </Link>
 
       <div className={styles.search}>
@@ -60,10 +69,10 @@ export default function TopBar({
           className={`${styles.iconButton} ${notificationsOpen ? styles.iconButtonActive : ''}`}
           aria-label="Уведомления"
           aria-expanded={notificationsOpen}
-          onClick={() => setNotificationsOpen((open) => !open)}
+          onClick={toggleNotifications}
         >
           <BellIcon />
-          <span className={styles.badge} aria-hidden="true" />
+          {!notificationsSeen && <span className={styles.badge} aria-hidden="true" />}
         </button>
         <Link to={ROUTES.chats} className={styles.iconButton} aria-label="Мои чаты">
           <ChatIcon />
