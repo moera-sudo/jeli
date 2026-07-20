@@ -9,6 +9,7 @@ from src.features.graph.router import router as GraphRouter
 from src.features.media.router import router as MediaRouter
 from src.features.messenger.router import router as MessengerRouter
 from src.features.notifications.router import router as NotificationsRouter
+from src.features.search.router import router as SearchRouter
 from src.features.user.router import router as UserRouter
 
 logger = logging.getLogger(__name__)
@@ -30,3 +31,4 @@ router.include_router(NotificationsRouter)
 router.include_router(MediaRouter)
 router.include_router(MessengerRouter)
 router.include_router(FamilyRouter)
+router.include_router(SearchRouter)
