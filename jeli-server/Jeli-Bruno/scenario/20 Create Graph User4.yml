@@ -1,0 +1,29 @@
+info:
+  name: 20 Create Graph User4
+  type: http
+  seq: 20
+
+http:
+  method: POST
+  url: "{{base_url}}/graph/create"
+  auth:
+    type: bearer
+    token: "{{access_token_4}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("person_id_4", res.body.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

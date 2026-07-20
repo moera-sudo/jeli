@@ -1,0 +1,34 @@
+info:
+  name: 1 Setup User1 Profile
+  type: http
+  seq: 1
+
+http:
+  method: PATCH
+  url: "{{base_url}}/users/profile/edit"
+  body:
+    type: json
+    data: |-
+      {
+        "gender": "male",
+        "birth_country": "KZ"
+      }
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: >-
+    gender обязателен для POST /graph/create (auth/Register сам его не выставляет) — этот сценарий
+    делает это заранее, до graph/Create.yml из другой папки, т.к. scenario/ (seq 2) прогоняется
+    раньше graph/ (seq 4).
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -5,10 +5,22 @@ info:
 
 http:
   method: GET
-  url: http://localhost:8000/api/users/88888888-8888-8888-8888-888888888888/matches
+  url: "{{base_url}}/users/{{user_id}}/matches"
   auth:
     type: bearer
-    token: PASTE_ACCESS_TOKEN_HERE
+    token: "{{access_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("returns a list of match candidates", function () {
+          expect(res.body).to.be.an("array");
+        });
 
 settings:
   encodeUrl: true

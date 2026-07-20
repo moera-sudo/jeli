@@ -2,11 +2,11 @@
 import logging
 import uuid
 
-from fastapi import Depends
+from fastapi import Depends, WebSocket
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config.database import get_db
+from src.config.database import AsyncSessionLocal, get_db
 from src.exceptions import UnauthorizedError
 from src.features.auth.constants import TOKEN_TYPE_ACCESS
 from src.features.auth.exceptions import InvalidTokenError
@@ -41,4 +41,24 @@ async def get_user(
         logger.info("Authorization failed: user %s not found", user_id)
         raise UnauthorizedError(message="User not found")
 
+    return user
+
+
+async def get_user_ws(websocket: WebSocket) -> User | None:
+    # * WS-версия авторизации: токен в query-параметре ?token=..., НЕ заголовок Authorization
+    # ! Никогда не бросает исключение — WS-роуты не проходят через HTTP exception handler из
+    # ! src/exceptions.py, поэтому эндпоинт сам решает, что делать с None (закрыть соединение до accept()).
+    token = websocket.query_params.get("token")
+    if not token:
+        logger.info("WS authorization failed: missing token query param")
+        return None
+    try:
+        user_id: uuid.UUID = decode_token(token, expected_type=TOKEN_TYPE_ACCESS)
+    except InvalidTokenError:
+        logger.info("WS authorization failed: invalid access token")
+        return None
+    async with AsyncSessionLocal() as db:
+        user = await user_service.get_by_id(db, user_id)
+    if user is None:
+        logger.info("WS authorization failed: user %s not found", user_id)
     return user

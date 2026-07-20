@@ -1,0 +1,41 @@
+info:
+  name: 16 Register User3
+  type: http
+  seq: 16
+
+http:
+  method: POST
+  url: "{{base_url}}/auth/register"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "scenario.user3@example.com",
+        "password": "string123",
+        "last_name": "Abenov",
+        "first_name": "Kid",
+        "patronymic": null,
+        "graph_invite_code": ""
+      }
+  auth: inherit
+  docs: "Третий аккаунт — будет присоединён (join) к узлу collaborator_person_id и станет коллаборатором user1."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("access_token_3", res.body.access_token);
+          bru.setVar("user_id_3", res.body.user.id);
+          bru.setVar("collaborator_user_id", res.body.user.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

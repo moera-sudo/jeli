@@ -42,8 +42,12 @@ class Person(Base):
     # * Перекрашивается (union-find) при подтверждённом браке/мэтче, см. service._link_clusters.
     origin_label: Mapped[uuid.UUID] = mapped_column(nullable=False, index=True, default=uuid.uuid4)
 
-    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    # * lower+trim от full_name — используется для pg_trgm similarity() в Этапе 4.
+    # * Nullable на уровне БД (старые записи бэкфиллятся пустыми, см. миграцию 0006) — обязательность
+    # * last_name/first_name для НОВЫХ узлов обеспечивается на уровне схем (PersonCreateRequest и т.п.).
+    last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    patronymic: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # * lower+trim от last_name+first_name+patronymic — используется для pg_trgm similarity() в мэтчинге.
     normalized_name: Mapped[str] = mapped_column(String(255), nullable=False)
     gender: Mapped[str] = mapped_column(String(16), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)

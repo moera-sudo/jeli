@@ -1,0 +1,31 @@
+info:
+  name: 13 Confirm Match Side B
+  type: http
+  seq: 13
+
+http:
+  method: POST
+  url: "{{base_url}}/matches/{{match_id}}/confirm"
+  auth:
+    type: bearer
+    token: "{{access_token_2}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("mutual confirmation merges the two clusters", function () {
+          expect(res.body.confirmed_at).to.be.a("string");
+          expect(res.body.person_a_confirmed).to.equal(true);
+          expect(res.body.person_b_confirmed).to.equal(true);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,33 @@
+info:
+  name: 10 Trigger Recompute A
+  type: http
+  seq: 10
+
+http:
+  method: PATCH
+  url: "{{base_url}}/persons/{{shared_ancestor_a}}"
+  body:
+    type: json
+    data: |-
+      {
+        "death_context": "natural"
+      }
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: >-
+    Шаги 04-05 создали пару 1-го поколения ДО того, как появился общий пра-предок (06-07) —
+    её собственный пересчёт мэтчей уже отработал по неполной цепочке. Тривиальная правка здесь
+    заново триггерит пересчёт (background task), теперь уже видя оба поколения разом.
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

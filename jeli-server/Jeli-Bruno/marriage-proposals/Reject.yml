@@ -5,10 +5,21 @@ info:
 
 http:
   method: POST
-  url: http://localhost:8000/api/marriage-proposals/66666666-6666-6666-6666-666666666666/reject
+  url: "{{base_url}}/marriage-proposals/{{proposal_id}}/reject"
   auth:
     type: bearer
-    token: PASTE_ACCESS_TOKEN_HERE
+    token: "{{access_token_4}}"
+  docs: >-
+    Прогоняется ПОСЛЕ Confirm.yml на той же proposal_id — ожидаем 409 ProposalAlreadyResolvedError
+    (нельзя отклонить уже подтверждённый брак), это осознанный тест на этот путь, не баг.
+
+runtime:
+  scripts:
+    - type: tests
+      code: |
+        test("rejects, or reports it's already resolved", function () {
+          expect([200, 409]).to.include(res.status);
+        });
 
 settings:
   encodeUrl: true

@@ -36,7 +36,9 @@ async def create_user(
     db: AsyncSession,
     email: str,
     hashed_password: str,
-    full_name: str,
+    last_name: str,
+    first_name: str,
+    patronymic: str | None = None,
     graph_invite_code: str | None = None,
     profile_fields: OptionalProfileFields | None = None,
 ) -> User:
@@ -45,7 +47,9 @@ async def create_user(
     user = User(
         email=email,
         hashed_password=hashed_password,
-        full_name=full_name,
+        last_name=last_name,
+        first_name=first_name,
+        patronymic=patronymic,
         avatar_url=DEFAULT_AVATAR_URL,
         graph_invite_code=graph_invite_code,
         **(profile_fields.model_dump(exclude_unset=True) if profile_fields else {}),
@@ -66,3 +70,12 @@ async def update_profile(db: AsyncSession, user: User, data: dict) -> User:
     await db.refresh(user)
     logger.info("User profile updated: %s (fields=%s)", user.id, list(data.keys()))
     return user
+
+
+async def delete_user(db: AsyncSession, user: User) -> None:
+    # * graph-сторона (передача владения/каскад удаления графа) должна быть уже обработана ДО вызова —
+    # * см. graph.service.handle_account_deletion, вызываемый из user.router перед этой функцией.
+    user_id = user.id
+    await db.delete(user)
+    await db.commit()
+    logger.info("User account deleted: %s", user_id)

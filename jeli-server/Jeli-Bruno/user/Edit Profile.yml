@@ -1,0 +1,40 @@
+info:
+  name: Edit Profile
+  type: http
+  seq: 4
+
+http:
+  method: PATCH
+  url: "{{base_url}}/users/profile/edit"
+  body:
+    type: json
+    data: |-
+      {
+        "gender": "male",
+        "birth_country": "KZ"
+      }
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: >-
+    Заполняет gender — обязательное условие для POST /graph/create (без него отдаёт 409
+    GenderRequiredError). Прогонять сразу после auth, до graph/*.
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("applies gender and birth_country", function () {
+          expect(res.body.gender).to.equal("male");
+          expect(res.body.birth_country).to.equal("KZ");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

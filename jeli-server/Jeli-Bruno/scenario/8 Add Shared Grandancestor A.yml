@@ -1,0 +1,55 @@
+info:
+  name: 8 Add Shared Grandancestor A
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{base_url}}/persons"
+  body:
+    type: json
+    data: |-
+      {
+        "last_name": "Bekturov",
+        "first_name": "Saken",
+        "patronymic": null,
+        "gender": "male",
+        "birth_country": "KZ",
+        "birth_region": "Almaty",
+        "birth_year_value": 1930,
+        "birth_year_precision": "decade",
+        "source_type": "oral_tradition",
+        "relation": {
+          "to_person_id": "{{shared_ancestor_a}}",
+          "type": "parent"
+        }
+      }
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: >-
+    Второе поколение общего предка — проверяет, что алгоритм умеет находить цепочку длиной 2,
+    а не только одиночное совпадение (docs/matching-algorhitm.md: единичное совпадение — шум).
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("creates the shared grandancestor on user1's side", function () {
+          expect(res.body.id).to.be.a("string");
+        });
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("shared_grandancestor_a", res.body.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

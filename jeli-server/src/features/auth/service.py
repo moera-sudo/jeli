@@ -101,7 +101,9 @@ async def register(db: AsyncSession, data: RegisterRequest) -> tuple[User, str, 
         db,
         email=data.email,
         hashed_password=hash_password(data.password),
-        full_name=data.full_name,
+        last_name=data.last_name,
+        first_name=data.first_name,
+        patronymic=data.patronymic,
         graph_invite_code=data.graph_invite_code,
     )
     await _try_link_invite_code(db, user, data.graph_invite_code)
@@ -121,7 +123,9 @@ async def register_with_info(db: AsyncSession, data: RegisterWithInfoRequest) ->
         db,
         email=data.email,
         hashed_password=hash_password(data.password),
-        full_name=data.full_name,
+        last_name=data.last_name,
+        first_name=data.first_name,
+        patronymic=data.patronymic,
         graph_invite_code=data.graph_invite_code,
         profile_fields=profile_fields,
     )

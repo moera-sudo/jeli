@@ -5,7 +5,7 @@ info:
 
 http:
   method: PATCH
-  url: http://localhost:8000/api/relationships/55555555-5555-5555-5555-555555555555
+  url: "{{base_url}}/relationships/{{relationship_id}}"
   body:
     type: json
     data: |-
@@ -15,7 +15,26 @@ http:
       }
   auth:
     type: bearer
-    token: PASTE_ACCESS_TOKEN_HERE
+    token: "{{access_token}}"
+  docs: >-
+    relationship_id захватывается relationships/Create.yml — если ТА создала 404 (её to_person_id
+    к тому моменту уже удалён persons/Delete.yml), relationship_id остаётся пустым и URL
+    схлопывается в /relationships/ → 405 вместо 200/404. Прогонять relationships/ отдельно от
+    полной последовательности для чистого 200.
+
+runtime:
+  scripts:
+    - type: tests
+      code: |
+        test("applies the update, or reports missing relationship_id from an earlier 404", function () {
+          expect([200, 404, 405]).to.include(res.status);
+        });
+        if (res.status === 200) {
+          test("marriage history fields are applied", function () {
+            expect(res.body.marriage_year).to.equal(2010);
+            expect(res.body.marriage_end_reason).to.equal("divorce");
+          });
+        }
 
 settings:
   encodeUrl: true

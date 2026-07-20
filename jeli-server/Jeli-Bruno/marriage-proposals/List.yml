@@ -5,10 +5,22 @@ info:
 
 http:
   method: GET
-  url: http://localhost:8000/api/marriage-proposals
+  url: "{{base_url}}/marriage-proposals"
   auth:
     type: bearer
-    token: PASTE_ACCESS_TOKEN_HERE
+    token: "{{access_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("returns a list of proposals", function () {
+          expect(res.body).to.be.an("array");
+        });
 
 settings:
   encodeUrl: true

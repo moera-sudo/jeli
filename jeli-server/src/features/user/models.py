@@ -15,7 +15,11 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # * Nullable на уровне БД, т.к. старые записи бэкфиллятся пустыми (см. миграцию 0006) — обязательность
+    # * last_name/first_name для НОВЫХ записей обеспечивается на уровне схем (RegisterRequest и т.п.).
+    last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    patronymic: Mapped[str | None] = mapped_column(String(255), nullable=True)
     avatar_url: Mapped[str] = mapped_column(String(1024), nullable=False, default=DEFAULT_AVATAR_URL)
     # * Nullable — не собирается на регистрации, заполняется позже через профиль. Нужен для
     # * создания root-Person (Person.gender обязателен), см. graph.service.create_root_person_for_user.

@@ -1,0 +1,29 @@
+info:
+  name: 12 Confirm Match Side A
+  type: http
+  seq: 12
+
+http:
+  method: POST
+  url: "{{base_url}}/matches/{{match_id}}/confirm"
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("confirms from user1's side", function () {
+          expect(res.body.person_a_confirmed || res.body.person_b_confirmed).to.equal(true);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

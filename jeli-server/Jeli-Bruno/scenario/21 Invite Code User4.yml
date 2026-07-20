@@ -1,0 +1,30 @@
+info:
+  name: 21 Invite Code User4
+  type: http
+  seq: 21
+
+http:
+  method: POST
+  url: "{{base_url}}/persons/{{person_id_4}}/invite-code"
+  auth:
+    type: bearer
+    token: "{{access_token_4}}"
+  docs: "Код user4's корня — потребляется marriage-proposals/Create.yml как target_invite_code (invite_code_4)."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("invite_code_4", res.body.invite_code);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

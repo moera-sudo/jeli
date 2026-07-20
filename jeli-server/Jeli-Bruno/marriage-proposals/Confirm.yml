@@ -5,10 +5,26 @@ info:
 
 http:
   method: POST
-  url: http://localhost:8000/api/marriage-proposals/66666666-6666-6666-6666-666666666666/confirm
+  url: "{{base_url}}/marriage-proposals/{{proposal_id}}/confirm"
   auth:
     type: bearer
-    token: PASTE_ACCESS_TOKEN_HERE
+    token: "{{access_token_4}}"
+  docs: >-
+    Подтверждает владелец ВТОРОЙ стороны — user4 (access_token_4, заполняется scenario/16-19).
+    Прогонять после marriage-proposals/Create.yml, реально создавшего pending на invite_code_4.
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("confirms the marriage from user4's side", function () {
+          expect(res.body.status).to.equal("confirmed");
+          expect(res.body.resulting_relationship_id).to.be.a("string");
+        });
 
 settings:
   encodeUrl: true

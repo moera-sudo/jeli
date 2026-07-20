@@ -24,7 +24,9 @@ class PersonNode(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    full_name: str
+    last_name: str | None
+    first_name: str | None
+    patronymic: str | None
     gender: Gender
     avatar_url: str | None
     generation: int
@@ -77,7 +79,9 @@ class PersonDetail(BaseModel):
     id: uuid.UUID
     owner_user_id: uuid.UUID
     linked_user_id: uuid.UUID | None
-    full_name: str
+    last_name: str | None
+    first_name: str | None
+    patronymic: str | None
     gender: Gender
     avatar_url: str | None
     is_alive: bool
@@ -117,7 +121,9 @@ class PersonRelationInput(BaseModel):
 
 
 class PersonCreateRequest(BaseModel):
-    full_name: str = Field(min_length=1, max_length=255)
+    last_name: str = Field(min_length=1, max_length=255)
+    first_name: str = Field(min_length=1, max_length=255)
+    patronymic: str | None = None
     gender: Gender
     avatar_url: str | None = None
     is_alive: bool = True
@@ -141,7 +147,9 @@ class PersonInsertBetweenRequest(BaseModel):
     # * Вставляет нового человека между двумя УЖЕ существующими напрямую связанными узлами
     # * (child_id --child_of--> parent_id) — без риска каскадного удаления при исправлении
     # * пропущенного поколения. См. service.insert_person_between.
-    full_name: str = Field(min_length=1, max_length=255)
+    last_name: str = Field(min_length=1, max_length=255)
+    first_name: str = Field(min_length=1, max_length=255)
+    patronymic: str | None = None
     gender: Gender
     avatar_url: str | None = None
     is_alive: bool = True
@@ -164,7 +172,9 @@ class PersonInsertBetweenRequest(BaseModel):
 
 class PersonUpdateRequest(BaseModel):
     # * Все поля опциональны, паттерн exclude_unset как в user.ProfileUpdateRequest.
-    full_name: str | None = None
+    last_name: str | None = None
+    first_name: str | None = None
+    patronymic: str | None = None
     gender: Gender | None = None
     avatar_url: str | None = None
     is_alive: bool | None = None
@@ -260,5 +270,7 @@ class SuccessorCandidate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    full_name: str
+    last_name: str | None
+    first_name: str | None
+    patronymic: str | None
     avatar_url: str

@@ -1,0 +1,30 @@
+info:
+  name: 19 Edit Profile User4
+  type: http
+  seq: 19
+
+http:
+  method: PATCH
+  url: "{{base_url}}/users/profile/edit"
+  body:
+    type: json
+    data: |-
+      {
+        "gender": "male",
+        "birth_country": "KZ"
+      }
+  auth:
+    type: bearer
+    token: "{{access_token_4}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
