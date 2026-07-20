@@ -142,6 +142,31 @@ export function ChatIcon(props) {
   )
 }
 
+export function SendIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" {...props}>
+      <path d="M21 3 10.5 13.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M21 3 14.5 21a.5.5 0 0 1-.94.05L10.5 13.5 3.9 10.44a.5.5 0 0 1 .05-.94L21 3Z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function ArrowLeftIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
+      <path d="M19 12H5M11 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function CheckIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
+      <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function CameraIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" {...props}>

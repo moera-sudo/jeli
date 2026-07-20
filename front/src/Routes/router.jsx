@@ -7,6 +7,8 @@ import PublicOnlyRoute from './PublicOnlyRoute'
 import HomePage from '../Pages/Home/HomePage'
 import Profile from '../Pages/Profile/Profile'
 import ProfileSetupPage from '../Pages/SetUp/ProfileSetupPage'
+import ChatsPage from '../Pages/Chat/ChatsPage'
+import ChatPage from '../Pages/Chat/ChatPage'
 import LoginPage from '../Pages/Auth/LoginPage'
 import RegisterPage from '../Pages/Auth/RegisterPage'
 
@@ -35,6 +37,8 @@ export const router = createBrowserRouter([
           { path: ROUTES.home, element: <HomePage /> },
           { path: ROUTES.onboarding, element: <ProfileSetupPage /> },
           { path: ROUTES.profile, element: <Profile /> },
+          { path: ROUTES.chats, element: <ChatsPage /> },
+          { path: ROUTES.chat, element: <ChatPage /> },
         ],
       },
     ],

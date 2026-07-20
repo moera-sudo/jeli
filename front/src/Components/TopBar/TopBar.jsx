@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { ROUTES } from '../../Routes/Routes'
 import { SearchIcon, BellIcon, BookIcon, ChatIcon } from '../../UI/icons'
+import NotificationsPanel from '../Notifications/NotificationsPanel'
 import styles from './TopBar.module.css'
 
 /**
@@ -21,6 +23,8 @@ export default function TopBar({
   historyActive = false,
   onToggleHistory,
 }) {
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+
   return (
     <header className={styles.bar}>
       <Link to={ROUTES.home} aria-label="На главную">
@@ -51,11 +55,17 @@ export default function TopBar({
             <BookIcon />
           </button>
         )}
-        <button type="button" className={styles.iconButton} aria-label="Уведомления">
+        <button
+          type="button"
+          className={`${styles.iconButton} ${notificationsOpen ? styles.iconButtonActive : ''}`}
+          aria-label="Уведомления"
+          aria-expanded={notificationsOpen}
+          onClick={() => setNotificationsOpen((open) => !open)}
+        >
           <BellIcon />
           <span className={styles.badge} aria-hidden="true" />
         </button>
-        <Link to={ROUTES.chat} className={styles.iconButton} aria-label="Мои чаты">
+        <Link to={ROUTES.chats} className={styles.iconButton} aria-label="Мои чаты">
           <ChatIcon />
         </Link>
         <Link to={ROUTES.profile} className={styles.avatar} aria-label="Профиль">
@@ -66,6 +76,8 @@ export default function TopBar({
           />
         </Link>
       </div>
+
+      <NotificationsPanel open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
     </header>
   )
 }

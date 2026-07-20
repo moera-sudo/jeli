@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { ROUTES } from '../../Routes/Routes'
+import { ROUTES, chatPath } from '../../Routes/Routes'
 import { downloadSvgAsImage } from '../../utils/exportImage'
 import {
   PlusIcon,
@@ -286,7 +286,7 @@ export default function GraphCanvas() {
             <div><dt>Место рождения</dt><dd>{hovered.node.birth}</dd></div>
           </dl>
           {hovered.node.state === 'registered' && !hovered.node.you && (
-            <Link to={ROUTES.chat} className={styles.hoverChat}>
+            <Link to={chatPath(hovered.node.id)} className={styles.hoverChat}>
               <ChatIcon /> Начать чат
             </Link>
           )}

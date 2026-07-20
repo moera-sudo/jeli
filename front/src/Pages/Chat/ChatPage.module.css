@@ -1,0 +1,235 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: #fafafa;
+}
+
+.main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: var(--space-5);
+}
+
+/* Conversation fills the available height; header and composer are pinned,
+   only the message list scrolls. */
+.conversation {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  background: var(--color-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- chat head */
+.chatHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  color: var(--color-ink);
+  border-radius: var(--radius-pill);
+  transition: background 0.2s ease;
+}
+
+.back:hover {
+  background: #f4f4f5;
+}
+
+.back svg {
+  width: 20px;
+  height: 20px;
+}
+
+.headAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+}
+
+.headInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.headName {
+  font-size: 0.98rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.headStatus {
+  font-size: 0.78rem;
+  color: #22c55e;
+}
+
+/* ----------------------------------------------------------------- messages */
+.messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  background: #fafafa;
+}
+
+.dayDivider {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.dayDivider span {
+  padding: 4px var(--space-3);
+  font-size: 0.72rem;
+  color: var(--color-muted);
+  background: var(--color-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+}
+
+.bubbleRow {
+  display: flex;
+}
+
+.theirs {
+  justify-content: flex-start;
+}
+
+.mine {
+  justify-content: flex-end;
+}
+
+.bubble {
+  max-width: 72%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.theirs .bubble {
+  background: var(--color-base);
+  border: 1px solid var(--color-border);
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+.mine .bubble {
+  background: var(--gradient-accent);
+  color: var(--color-base);
+  border-bottom-right-radius: var(--radius-sm);
+}
+
+.bubbleText {
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.bubbleTime {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  text-align: right;
+  opacity: 0.7;
+}
+
+/* ----------------------------------------------------------------- composer */
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-base);
+}
+
+.attach {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  color: var(--color-muted);
+  border-radius: var(--radius-pill);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.attach:hover {
+  background: #f4f4f5;
+  color: var(--color-accent);
+}
+
+.attach svg {
+  width: 20px;
+  height: 20px;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  max-height: 120px;
+  padding: var(--space-3) var(--space-4);
+  background: #f4f4f5;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.input::placeholder {
+  color: var(--color-muted);
+}
+
+.input:focus {
+  background: var(--color-base);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px rgba(255, 118, 72, 0.12);
+}
+
+.send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  color: var(--color-base);
+  background: var(--gradient-accent);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 12px 24px -8px rgba(232, 92, 43, 0.5);
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.send:hover {
+  opacity: 0.94;
+}
+
+.send:active {
+  transform: translateY(1px);
+}
+
+.send svg {
+  width: 20px;
+  height: 20px;
+}

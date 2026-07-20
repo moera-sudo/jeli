@@ -1,0 +1,208 @@
+/* Dimmed backdrop over the whole viewport. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(26, 26, 26, 0.28);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.backdropOpen {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Tall vertical panel pinned to the right edge; slides in from off-screen. */
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  width: min(400px, 92vw);
+  height: 100dvh;
+  background: var(--color-base);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -20px 0 50px -24px rgba(26, 26, 26, 0.35);
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+}
+
+.open {
+  transform: translateX(0);
+}
+
+/* -------------------------------------------------------------------- head */
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.title {
+  font-size: 1.2rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.subtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.markAll {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-muted);
+  border-radius: var(--radius-sm);
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.markAll:hover {
+  color: var(--color-accent);
+  background: rgba(255, 118, 72, 0.1);
+}
+
+.markAll svg {
+  width: 15px;
+  height: 15px;
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--color-muted);
+  border-radius: var(--radius-pill);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.close:hover {
+  background: #f4f4f5;
+  color: var(--color-ink);
+}
+
+.close svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ------------------------------------------------------------------- items */
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  padding: var(--space-2) 0;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  transition: background 0.15s ease;
+}
+
+.item:hover {
+  background: #fafafa;
+}
+
+.itemUnread {
+  background: rgba(255, 118, 72, 0.05);
+}
+
+.itemIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  color: var(--color-ink);
+  background: #f0f0f1;
+}
+
+.itemIcon svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Tone accents for the icon chips. */
+.match {
+  color: var(--color-accent);
+  background: rgba(255, 118, 72, 0.12);
+}
+
+.chat {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.invite {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.system {
+  color: var(--color-muted);
+  background: #f0f0f1;
+}
+
+.itemBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemTitle {
+  font-size: 0.92rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.itemText {
+  margin-top: 2px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--color-muted);
+}
+
+.itemTime {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: 0.72rem;
+  color: var(--color-muted);
+}
+
+.unreadDot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: var(--space-2);
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+}

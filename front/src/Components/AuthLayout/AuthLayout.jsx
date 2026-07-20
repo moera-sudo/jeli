@@ -28,7 +28,7 @@ export default function AuthLayout({ title, subtitle, switchTo, children }) {
             <div className={styles.asideHeading}>
               <span className={styles.asideEyebrow}>Краудсорсинговый конструктор родословной</span>
               <p className={styles.tagline}>
-                Воссоедините свой род в один клик.
+                Каждый помнит своё. Вместе — помним род.
               </p>
             </div>
           </div>

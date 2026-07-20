@@ -6,5 +6,9 @@ export const ROUTES = {
   onboarding: '/onboarding',
   profile: '/profile',
   addMember: '/add-member',
-  chat: '/chat',
+  chats: '/chats',
+  chat: '/chats/:id',
 }
+
+/** Builds the path to a single conversation. */
+export const chatPath = (id) => `/chats/${id}`
