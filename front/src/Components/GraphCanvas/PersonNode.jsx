@@ -2,6 +2,7 @@ import { Handle, Position } from '@xyflow/react'
 
 import { UserIcon } from '../../UI/icons'
 import { formatPersonName } from '../../utils/fullName'
+import { resolveMediaUrl } from '../../api/mediaService'
 import styles from './GraphCanvas.module.css'
 
 /**
@@ -42,7 +43,7 @@ export default function PersonNode({ data, selected }) {
       <span className={styles.avatarWrap} aria-hidden="true">
         <span className={styles.avatar}>
           {person.avatar_url ? (
-            <img className={styles.avatarImg} src={person.avatar_url} alt="" />
+            <img className={styles.avatarImg} src={resolveMediaUrl(person.avatar_url)} alt="" />
           ) : (
             <UserIcon />
           )}

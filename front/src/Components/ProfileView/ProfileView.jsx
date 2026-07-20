@@ -8,6 +8,7 @@ import {
 } from '../../UI/icons'
 import { formatDate, displayValue } from '../../utils/format'
 import { formatPersonName } from '../../utils/fullName'
+import { resolveMediaUrl } from '../../api/mediaService'
 import styles from '../../Pages/Profile/Profile.module.css'
 
 const GENDER_LABELS = { male: 'Мужской', female: 'Женский' }
@@ -63,7 +64,7 @@ export default function ProfileView({
       {/* ------------------------------------------------- profile column */}
       <Card className={styles.identity}>
         <div className={styles.avatarWrap}>
-          <img className={styles.avatar} src={person.avatar_url} alt={avatarAlt} />
+          <img className={styles.avatar} src={resolveMediaUrl(person.avatar_url)} alt={avatarAlt} />
         </div>
 
         <h1 className={styles.name}>{formatPersonName(person, '—')}</h1>

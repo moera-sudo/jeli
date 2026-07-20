@@ -101,6 +101,23 @@
   object-fit: cover;
 }
 
+.avatarFallback {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  color: var(--color-muted);
+  background: #f0f0f1;
+  border-radius: var(--radius-pill);
+}
+
+.avatarFallback svg { width: 26px; height: 26px; }
+
+.centered { display: flex; align-items: center; justify-content: center; padding: var(--space-7, 48px); }
+.empty { padding: var(--space-7, 48px) var(--space-5); text-align: center; color: var(--color-muted); font-size: 0.92rem; line-height: 1.5; }
+
 .body {
   flex: 1;
   min-width: 0;

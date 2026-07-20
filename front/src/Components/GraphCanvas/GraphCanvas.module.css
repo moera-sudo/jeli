@@ -512,6 +512,51 @@
 
 .formInput:focus { outline: 2px solid rgba(255, 118, 72, 0.4); outline-offset: 1px; }
 
+/* Avatar picker inside the person-edit modal. */
+.avatarPick {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.avatarPickImg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  color: var(--color-muted);
+  background: #f0f0f1;
+  border: 3px solid var(--color-base);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.avatarPickImg img { width: 100%; height: 100%; object-fit: cover; }
+.avatarPickImg svg { width: 40px; height: 40px; }
+
+.avatarPickBadge {
+  position: absolute;
+  top: 58px;
+  left: calc(50% + 22px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--color-base);
+  background: var(--gradient-accent);
+  border: 3px solid var(--color-base);
+  border-radius: var(--radius-pill);
+}
+
+.avatarPickBadge svg { width: 14px; height: 14px; }
+.avatarPickHint { font-size: 0.8rem; color: var(--color-muted); }
+
 .genderRow { display: inline-flex; gap: var(--space-2); }
 
 .genderOpt {

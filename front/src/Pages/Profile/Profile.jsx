@@ -12,6 +12,7 @@ import { getSuccessorCandidates } from '../../api/graphService'
 import { useAuth } from '../../auth/AuthContext'
 import { ROUTES } from '../../Routes/Routes'
 import { formatPersonName } from '../../utils/fullName'
+import { resolveMediaUrl } from '../../api/mediaService'
 import styles from './Profile.module.css'
 
 /** Small centred dialog used by the account-deletion flow. */
@@ -124,6 +125,7 @@ export default function Profile() {
             submitLabel="Сохранить изменения"
             onSubmit={handleSave}
             onCancel={() => setEditing(false)}
+            onAvatarChange={setUser}
           />
         ) : (
           <ProfileView
@@ -187,7 +189,7 @@ export default function Profile() {
                     checked={pickedSuccessor === c.id}
                     onChange={() => setPickedSuccessor(c.id)}
                   />
-                  {c.avatar_url && <img src={c.avatar_url} alt="" className={styles.pickerAvatar} />}
+                  {c.avatar_url && <img src={resolveMediaUrl(c.avatar_url)} alt="" className={styles.pickerAvatar} />}
                   <span>{formatPersonName(c, 'Без имени')}</span>
                 </label>
               </li>

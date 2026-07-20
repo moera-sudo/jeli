@@ -5,6 +5,7 @@ import NameFields from '../NameFields/NameFields'
 import Button from '../../UI/Button/Button'
 import { CameraIcon } from '../../UI/icons'
 import { joinFullName, formatPersonName } from '../../utils/fullName'
+import { uploadProfileAvatar, resolveMediaUrl } from '../../api/mediaService'
 // * Shared profile visuals — same stylesheet as the read-only Profile page,
 // * so the editable form looks exactly like the profile itself.
 import styles from '../../Pages/Profile/Profile.module.css'
@@ -89,6 +90,7 @@ function buildPayload(state, includeName) {
  * @param {string}   props.submitLabel
  * @param {(payload: object) => Promise<void>} props.onSubmit
  * @param {() => void} [props.onCancel]       Optional cancel handler (edit mode).
+ * @param {(user: object) => void} [props.onAvatarChange]  Called with the updated UserMe after an avatar upload.
  */
 export default function ProfileEditor({
   initialValues = {},
@@ -97,10 +99,12 @@ export default function ProfileEditor({
   submitLabel,
   onSubmit,
   onCancel,
+  onAvatarChange,
 }) {
   const isEdit = mode === 'edit'
   const [values, setValues] = useState(() => toFormState(initialValues))
   const [avatarPreview, setAvatarPreview] = useState(isEdit ? initialValues.avatar_url : '')
+  const [avatarUploading, setAvatarUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -115,10 +119,23 @@ export default function ProfileEditor({
   const handleNameChange = (field, value) =>
     setValues((prev) => ({ ...prev, [field]: value }))
 
-  // Local-only preview; the file is not uploaded (backend not ready).
-  const handleAvatarChange = (event) => {
+  // Instant local preview, then upload and persist the avatar server-side.
+  const handleAvatarChange = async (event) => {
     const file = event.target.files?.[0]
-    if (file) setAvatarPreview(URL.createObjectURL(file))
+    event.target.value = ''
+    if (!file) return
+    setAvatarPreview(URL.createObjectURL(file))
+    setError('')
+    setAvatarUploading(true)
+    try {
+      const updated = await uploadProfileAvatar(file)
+      setAvatarPreview(updated.avatar_url)
+      onAvatarChange?.(updated)
+    } catch (err) {
+      setError(err.message || 'Не удалось загрузить аватар')
+    } finally {
+      setAvatarUploading(false)
+    }
   }
 
   // Revoke the object URL created for the preview on unmount/replace.
@@ -165,7 +182,7 @@ export default function ProfileEditor({
             onChange={handleAvatarChange}
           />
           {avatarPreview ? (
-            <img className={styles.avatar} src={avatarPreview} alt="Загруженный аватар" />
+            <img className={styles.avatar} src={resolveMediaUrl(avatarPreview)} alt="Загруженный аватар" style={avatarUploading ? { opacity: 0.6 } : undefined} />
           ) : (
             <span className={styles.avatarPlaceholder} aria-hidden="true">
               <CameraIcon />

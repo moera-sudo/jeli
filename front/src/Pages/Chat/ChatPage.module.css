@@ -57,10 +57,28 @@
   object-fit: cover;
 }
 
+.headAvatarFallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  color: var(--color-muted);
+  background: #f0f0f1;
+  border-radius: var(--radius-pill);
+}
+
+.headAvatarFallback svg { width: 22px; height: 22px; }
+
 .headName {
   font-size: 0.98rem;
   font-weight: var(--font-weight-bold);
 }
+
+.centered { flex: 1; display: flex; align-items: center; justify-content: center; }
+.emptyMsg { margin: auto; color: var(--color-muted); font-size: 0.9rem; }
+.error { padding: 0 var(--space-5) var(--space-2); font-size: 0.83rem; color: var(--color-danger); }
+.bubbleImg { display: block; max-width: 220px; width: 100%; height: auto; border-radius: var(--radius-md); }
 
 /* ----------------------------------------------------------------- messages */
 .messages {

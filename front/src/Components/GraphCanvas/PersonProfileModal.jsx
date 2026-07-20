@@ -12,6 +12,7 @@ import {
   CheckIcon,
 } from '../../UI/icons'
 import { formatPersonName } from '../../utils/fullName'
+import { resolveMediaUrl } from '../../api/mediaService'
 import styles from './GraphCanvas.module.css'
 
 const GENDER_LABELS = { male: 'Мужской', female: 'Женский' }
@@ -108,7 +109,7 @@ export default function PersonProfileModal({
           <div className={styles.pmBody}>
             <div className={styles.pmIdentity}>
               <span className={styles.pmAvatar} aria-hidden="true">
-                {detail.avatar_url ? <img src={detail.avatar_url} alt="" /> : <UserIcon />}
+                {detail.avatar_url ? <img src={resolveMediaUrl(detail.avatar_url)} alt="" /> : <UserIcon />}
               </span>
               <p className={styles.pmName}>{formatPersonName(detail, 'Без имени')}</p>
               {detail.relation_to_viewer && <p className={styles.pmRelation}>{detail.relation_to_viewer}</p>}

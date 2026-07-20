@@ -1,24 +1,60 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import TopBar from '../../Components/TopBar/TopBar'
-import { SearchIcon } from '../../UI/icons'
+import Loader from '../../UI/Loader/Loader'
+import { SearchIcon, UserIcon } from '../../UI/icons'
 import { chatPath } from '../../Routes/Routes'
+import { listChats } from '../../api/messengerService'
+import { getPublicProfile } from '../../api/profileService'
+import { resolveMediaUrl } from '../../api/mediaService'
+import { formatPersonName } from '../../utils/fullName'
 import styles from './ChatsPage.module.css'
 
-/**
- * Chat history — the list of conversations. Layout only: the chats are static
- * sample data and the search field is not wired. Each row links to the
- * conversation page.
- */
-const CHATS = [
-  { id: 1, name: 'Ерлан Серіков', avatar: 'https://i.pravatar.cc/96?img=12', last: 'Нашёл общего предка по линии Ботбай!', time: '12:40', unread: 2 },
-  { id: 2, name: 'Динара Ахметова', avatar: 'https://i.pravatar.cc/96?img=32', last: 'Отправила старые фотографии семьи', time: '11:05', unread: 0 },
-  { id: 3, name: 'Род Ботбай · группа', avatar: 'https://i.pravatar.cc/96?img=5', last: 'Асель: спасибо за приглашение 🙌', time: 'Вчера', unread: 5 },
-  { id: 4, name: 'Асан Дулатов', avatar: 'https://i.pravatar.cc/96?img=15', last: 'Вы: давайте свяжемся на выходных', time: 'Вчера', unread: 0 },
-  { id: 5, name: 'Мая Серікова', avatar: 'https://i.pravatar.cc/96?img=45', last: 'Хорошо, договорились!', time: 'Пн', unread: 0 },
-]
+const TIME_FMT = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+function formatTime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : TIME_FMT.format(d)
+}
 
+/** Conversation list, backed by GET /chats (+ peer profiles for name/avatar). */
 export default function ChatsPage() {
+  const [chats, setChats] = useState(null)
+  const [peers, setPeers] = useState({})
+  const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    let active = true
+    listChats()
+      .then(async (list) => {
+        if (!active) return
+        setChats(list)
+        const ids = [...new Set(list.map((c) => c.peer_user_id))]
+        const entries = await Promise.all(
+          ids.map(async (id) => {
+            try { return [id, await getPublicProfile(id)] } catch { return [id, null] }
+          }),
+        )
+        if (active) setPeers(Object.fromEntries(entries))
+      })
+      .catch(() => active && setChats([]))
+    return () => { active = false }
+  }, [])
+
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return (chats ?? [])
+      .map((c) => ({
+        id: c.id,
+        name: formatPersonName(peers[c.peer_user_id], 'Родственник'),
+        avatar: resolveMediaUrl(peers[c.peer_user_id]?.avatar_url),
+        last: c.last_message?.content ?? '',
+        time: formatTime(c.last_message?.created_at ?? c.created_at),
+      }))
+      .filter((r) => r.name.toLowerCase().includes(q))
+  }, [chats, peers, query])
+
   return (
     <div className={styles.page}>
       <TopBar />
@@ -30,36 +66,43 @@ export default function ChatsPage() {
         </header>
 
         <div className={styles.search}>
-          <span className={styles.searchIcon} aria-hidden="true">
-            <SearchIcon />
-          </span>
+          <span className={styles.searchIcon} aria-hidden="true"><SearchIcon /></span>
           <input
             type="search"
             className={styles.searchInput}
             placeholder="Поиск по чатам…"
             aria-label="Поиск по чатам"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
           />
         </div>
 
-        <ul className={styles.list}>
-          {CHATS.map((chat) => (
-            <li key={chat.id}>
-              <Link to={chatPath(chat.id)} className={styles.row}>
-                <img className={styles.avatar} src={chat.avatar} alt="" />
-
-                <span className={styles.body}>
-                  <span className={styles.name}>{chat.name}</span>
-                  <span className={styles.preview}>{chat.last}</span>
-                </span>
-
-                <span className={styles.meta}>
-                  <span className={styles.time}>{chat.time}</span>
-                  {chat.unread > 0 && <span className={styles.unread}>{chat.unread}</span>}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {chats === null ? (
+          <div className={styles.centered}><Loader /></div>
+        ) : rows.length === 0 ? (
+          <p className={styles.empty}>Пока нет чатов. Откройте карточку родственника и нажмите «Открыть чат».</p>
+        ) : (
+          <ul className={styles.list}>
+            {rows.map((chat) => (
+              <li key={chat.id}>
+                <Link to={chatPath(chat.id)} className={styles.row}>
+                  {chat.avatar ? (
+                    <img className={styles.avatar} src={chat.avatar} alt="" />
+                  ) : (
+                    <span className={styles.avatarFallback} aria-hidden="true"><UserIcon /></span>
+                  )}
+                  <span className={styles.body}>
+                    <span className={styles.name}>{chat.name}</span>
+                    {chat.last && <span className={styles.preview}>{chat.last}</span>}
+                  </span>
+                  <span className={styles.meta}>
+                    <span className={styles.time}>{chat.time}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </main>
     </div>
   )

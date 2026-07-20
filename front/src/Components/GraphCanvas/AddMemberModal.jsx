@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import Button from '../../UI/Button/Button'
 import { CloseIcon, UserIcon } from '../../UI/icons'
 import { formatPersonName } from '../../utils/fullName'
+import { resolveMediaUrl } from '../../api/mediaService'
 import styles from './GraphCanvas.module.css'
 
 // * Roles offered to the user. Each maps onto a backend relation + gender in
@@ -194,7 +195,7 @@ export default function AddMemberModal({ targetName, people = [], onSubmit, onCl
                         <label className={styles.pickerItem}>
                           <input type="radio" name="existing-person" checked={pickedId === p.id} onChange={() => setPickedId(p.id)} />
                           {p.avatar_url ? (
-                            <img src={p.avatar_url} alt="" className={styles.pickerAvatar} />
+                            <img src={resolveMediaUrl(p.avatar_url)} alt="" className={styles.pickerAvatar} />
                           ) : (
                             <span className={styles.pickerIcon} aria-hidden="true"><UserIcon /></span>
                           )}

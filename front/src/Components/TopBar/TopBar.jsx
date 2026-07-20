@@ -5,6 +5,7 @@ import { ROUTES } from '../../Routes/Routes'
 import { SearchIcon, BellIcon, BookIcon, ChatIcon, UsersIcon } from '../../UI/icons'
 import NotificationsPanel from '../Notifications/NotificationsPanel'
 import { useAuth } from '../../auth/AuthContext'
+import { resolveMediaUrl } from '../../api/mediaService'
 import logo from '../../assets/logo_2.png'
 import styles from './TopBar.module.css'
 
@@ -94,7 +95,7 @@ export default function TopBar({
         </Link>
         <Link to={ROUTES.profile} className={styles.avatar} aria-label="Профиль">
           <img
-            src={user?.avatar_url || 'https://placehold.co/80x80?text=%20'}
+            src={resolveMediaUrl(user?.avatar_url) || 'https://placehold.co/80x80?text=%20'}
             alt=""
             className={styles.avatarImg}
           />

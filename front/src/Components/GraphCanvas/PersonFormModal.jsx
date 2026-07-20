@@ -1,7 +1,8 @@
 import { useState } from 'react'
 
 import Button from '../../UI/Button/Button'
-import { CloseIcon } from '../../UI/icons'
+import { CloseIcon, CameraIcon, UserIcon } from '../../UI/icons'
+import { uploadPersonAvatar, resolveMediaUrl } from '../../api/mediaService'
 import styles from './GraphCanvas.module.css'
 
 const GENDER_OPTIONS = [
@@ -21,8 +22,10 @@ const GENDER_OPTIONS = [
  * @param {string}   props.submitLabel
  * @param {(values: object) => Promise<void>} props.onSubmit
  * @param {() => void} props.onClose
+ * @param {string}   [props.personId]      When set, shows an avatar uploader for that node.
+ * @param {() => void} [props.onAvatarChange]  Called after an avatar upload (to refresh the graph).
  */
-export default function PersonFormModal({ title, initial = {}, submitLabel, onSubmit, onClose }) {
+export default function PersonFormModal({ title, initial = {}, submitLabel, onSubmit, onClose, personId, onAvatarChange }) {
   const [lastName, setLastName] = useState(initial.last_name ?? '')
   const [firstName, setFirstName] = useState(initial.first_name ?? '')
   const [patronymic, setPatronymic] = useState(initial.patronymic ?? '')
@@ -31,8 +34,28 @@ export default function PersonFormModal({ title, initial = {}, submitLabel, onSu
     initial.birth_year_value != null ? String(initial.birth_year_value) : '',
   )
   const [isAlive, setIsAlive] = useState(initial.is_alive ?? true)
+  const [avatar, setAvatar] = useState(initial.avatar_url ?? '')
+  const [avatarUploading, setAvatarUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !personId) return
+    setAvatar(URL.createObjectURL(file))
+    setError('')
+    setAvatarUploading(true)
+    try {
+      const updated = await uploadPersonAvatar(personId, file)
+      setAvatar(updated.avatar_url)
+      onAvatarChange?.()
+    } catch (err) {
+      setError(err.message || 'Не удалось загрузить аватар')
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
 
   const canSubmit =
     lastName.trim().length > 0 &&
@@ -76,6 +99,17 @@ export default function PersonFormModal({ title, initial = {}, submitLabel, onSu
         </header>
 
         <form className={styles.modalForm} onSubmit={handleSubmit} noValidate>
+          {personId && (
+            <label className={styles.avatarPick}>
+              <input type="file" accept="image/*" hidden onChange={handleAvatarChange} />
+              <span className={styles.avatarPickImg} style={avatarUploading ? { opacity: 0.6 } : undefined}>
+                {avatar ? <img src={resolveMediaUrl(avatar)} alt="" /> : <UserIcon />}
+              </span>
+              <span className={styles.avatarPickBadge} aria-hidden="true"><CameraIcon /></span>
+              <span className={styles.avatarPickHint}>{avatarUploading ? 'Загрузка…' : 'Сменить фото'}</span>
+            </label>
+          )}
+
           <label className={styles.formLabel}>
             Фамилия *
             <input

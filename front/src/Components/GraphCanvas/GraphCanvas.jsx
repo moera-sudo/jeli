@@ -16,6 +16,8 @@ import { DownloadIcon, CloseIcon, CheckIcon, PlusIcon, MinusIcon, FullscreenIcon
 import { downloadSvgAsImage } from '../../utils/exportImage'
 import { buildFlow, NODE_SIZE, UNION_SIZE } from '../../utils/buildFlow'
 import { formatPersonName } from '../../utils/fullName'
+import { resolveMediaUrl } from '../../api/mediaService'
+import { createChat } from '../../api/messengerService'
 import { ROUTES, chatPath } from '../../Routes/Routes'
 import {
   getHouseholdGraph,
@@ -530,10 +532,15 @@ function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraph
     }
   }
 
-  // Open the chat with a registered relative — their thread if one exists,
-  // otherwise the chats list.
-  const handleOpenChat = () => {
-    navigate(detail?.chat_thread_id ? chatPath(detail.chat_thread_id) : ROUTES.chats)
+  // Open (or create) the chat with a registered relative and go to it.
+  const handleOpenChat = async () => {
+    if (!detail?.id) return
+    try {
+      const chat = await createChat(detail.id)
+      navigate(chatPath(chat.id))
+    } catch (err) {
+      flash(err.message || 'Не удалось открыть чат')
+    }
   }
 
   // Owner delegates (or revokes) edit rights so a registered relative can also
@@ -680,6 +687,8 @@ function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraph
           title="Изменить данные"
           submitLabel="Сохранить"
           initial={detail}
+          personId={detail.id}
+          onAvatarChange={async () => { await loadGraph(); await loadDetail(detail.id) }}
           onSubmit={submitEdit}
           onClose={closeModal}
         />
@@ -763,7 +772,7 @@ function SuccessorModal({ candidates, onPick, onClose }) {
           <li key={c.id}>
             <label className={styles.pickerItem}>
               <input type="radio" name="successor" checked={picked === c.id} onChange={() => setPicked(c.id)} />
-              {c.avatar_url && <img src={c.avatar_url} alt="" className={styles.pickerAvatar} />}
+              {c.avatar_url && <img src={resolveMediaUrl(c.avatar_url)} alt="" className={styles.pickerAvatar} />}
               <span>{formatPersonName(c, 'Без имени')}</span>
             </label>
           </li>
