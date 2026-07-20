@@ -8,7 +8,7 @@ import Button from '../../UI/Button/Button'
 import { MailIcon, LockIcon, UsersIcon, ArrowRightIcon } from '../../UI/icons'
 import { ROUTES } from '../../Routes/Routes'
 import { useAuth } from '../../auth/AuthContext'
-import { isValidEmail, isValidPassword, isValidFamilyCode } from '../../utils/validation'
+import { isValidEmail, isValidPassword, isValidFamilyCode, normalizeInviteCode } from '../../utils/validation'
 import { joinFullName } from '../../utils/fullName'
 import styles from './AuthForm.module.css'
 
@@ -45,9 +45,9 @@ export default function RegisterPage() {
     (!hasFamily || isValidFamilyCode(familyCode)) &&
     !submitting
 
-  // Digits-only, capped at 6 characters, for the invite code field.
+  // Crockford Base32, upper-cased and capped at 8 characters.
   const handleCodeChange = (event) =>
-    setFamilyCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+    setFamilyCode(normalizeInviteCode(event.target.value))
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -134,12 +134,13 @@ export default function RegisterPage() {
             label="Код приглашения"
             type="text"
             name="familyCode"
-            placeholder="6-значный код"
-            inputMode="numeric"
+            placeholder="8-значный код, напр. AB3D7K9M"
+            autoCapitalize="characters"
+            autoComplete="off"
             icon={<UsersIcon />}
             value={familyCode}
             onChange={handleCodeChange}
-            error={codeInvalid ? 'Код состоит из 6 цифр' : undefined}
+            error={codeInvalid ? 'Код состоит из 8 символов (буквы и цифры)' : undefined}
           />
         )}
 

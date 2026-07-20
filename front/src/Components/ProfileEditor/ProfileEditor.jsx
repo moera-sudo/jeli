@@ -26,7 +26,14 @@ const ORIGIN_FIELDS = [
   { name: 'ru', label: 'Ру (род)', placeholder: 'Куандык' },
 ]
 
-const FIELD_NAMES = [...GENERAL_FIELDS, ...ORIGIN_FIELDS].map((f) => f.name).concat('description')
+// * `gender` is a segmented control (not a TextField) but still travels through
+// * the shared form state / payload pipeline.
+const FIELD_NAMES = [...GENERAL_FIELDS, ...ORIGIN_FIELDS].map((f) => f.name).concat('description', 'gender')
+
+const GENDER_OPTIONS = [
+  { value: 'male', label: 'Мужской' },
+  { value: 'female', label: 'Женский' },
+]
 
 /**
  * Initial string state (null/undefined → '') from a user object.
@@ -92,6 +99,8 @@ export default function ProfileEditor({
 
   const setField = (name) => (event) =>
     setValues((prev) => ({ ...prev, [name]: event.target.value }))
+
+  const setGender = (value) => setValues((prev) => ({ ...prev, gender: value }))
 
   const handleNameChange = (field, value) =>
     setValues((prev) => ({ ...prev, [field]: value }))
@@ -190,6 +199,30 @@ export default function ProfileEditor({
           <header className={styles.cardHead}>
             <h2 className={styles.cardTitle}>Общая информация</h2>
           </header>
+
+          <div className={styles.genderField}>
+            <span className={styles.genderLabel}>
+              Пол
+              {requiredSet.has('gender') && <span className={styles.requiredMark} aria-hidden="true"> *</span>}
+            </span>
+            <div className={styles.genderOptions} role="radiogroup" aria-label="Пол">
+              {GENDER_OPTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={values.gender === value}
+                  className={[styles.genderOption, values.gender === value ? styles.genderOptionActive : '']
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => setGender(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className={styles.fields}>{GENERAL_FIELDS.map(renderField)}</div>
         </section>
 

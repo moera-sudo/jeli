@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { ROUTES } from '../../Routes/Routes'
-import { SearchIcon, BellIcon, BookIcon, ChatIcon } from '../../UI/icons'
+import { SearchIcon, BellIcon, BookIcon, ChatIcon, UsersIcon } from '../../UI/icons'
 import NotificationsPanel from '../Notifications/NotificationsPanel'
+import { useAuth } from '../../auth/AuthContext'
 import logo from '../../assets/logo_2.png'
 import styles from './TopBar.module.css'
 
@@ -23,7 +24,10 @@ export default function TopBar({
   searchPlaceholder = 'Найти родственника по имени…',
   historyActive = false,
   onToggleHistory,
+  matchesActive = false,
+  onToggleMatches,
 }) {
+  const { user } = useAuth()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   // Opening the panel marks everything as read → the unread dot clears.
   const [notificationsSeen, setNotificationsSeen] = useState(false)
@@ -53,6 +57,17 @@ export default function TopBar({
       </div>
 
       <div className={styles.actions}>
+        {onToggleMatches && (
+          <button
+            type="button"
+            className={`${styles.iconButton} ${matchesActive ? styles.iconButtonActive : ''}`}
+            aria-label="Совпадения и запросы"
+            aria-pressed={matchesActive}
+            onClick={onToggleMatches}
+          >
+            <UsersIcon />
+          </button>
+        )}
         {onToggleHistory && (
           <button
             type="button"
@@ -79,7 +94,7 @@ export default function TopBar({
         </Link>
         <Link to={ROUTES.profile} className={styles.avatar} aria-label="Профиль">
           <img
-            src="https://i.pravatar.cc/80?img=47"
+            src={user?.avatar_url || 'https://placehold.co/80x80?text=%20'}
             alt=""
             className={styles.avatarImg}
           />

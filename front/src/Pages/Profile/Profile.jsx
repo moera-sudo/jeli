@@ -21,6 +21,8 @@ import { ROUTES } from '../../Routes/Routes'
 import { formatDate, displayValue } from '../../utils/format'
 import styles from './Profile.module.css'
 
+const GENDER_LABELS = { male: 'Мужской', female: 'Женский' }
+
 /** A label → value row used across the info cards. */
 function InfoRow({ icon, label, value }) {
   return (
@@ -116,6 +118,7 @@ export default function Profile() {
             <div className={styles.info}>
               <Card title="Общая информация">
                 <div className={styles.rows}>
+                  <InfoRow icon={<UserIcon />} label="Пол" value={displayValue(GENDER_LABELS[user.gender])} />
                   <InfoRow icon={<CalendarIcon />} label="Дата рождения" value={formatDate(user.birth_date)} />
                   <InfoRow
                     icon={<LocationIcon />}

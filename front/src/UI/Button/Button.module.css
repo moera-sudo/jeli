@@ -53,6 +53,17 @@
   opacity: 0.94;
 }
 
+/* Danger: outlined red — destructive actions (remove member, etc.). */
+.danger {
+  background: var(--color-base);
+  color: var(--color-danger);
+  border: 1px solid rgba(220, 53, 69, 0.35);
+}
+
+.danger:hover {
+  background: rgba(220, 53, 69, 0.08);
+}
+
 .fullWidth {
   width: 100%;
 }

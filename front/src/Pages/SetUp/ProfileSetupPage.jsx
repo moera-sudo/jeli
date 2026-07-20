@@ -10,6 +10,7 @@ import styles from './ProfileSetupPage.module.css'
 
 // * Fields that must be filled before the fresh profile can be saved.
 const REQUIRED_FIELDS = [
+  'gender',
   'birth_date',
   'birth_city',
   'birth_country',

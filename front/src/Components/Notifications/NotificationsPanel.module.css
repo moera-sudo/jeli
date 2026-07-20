@@ -71,6 +71,13 @@
   height: 18px;
 }
 
+.empty {
+  padding: var(--space-6, 40px) var(--space-5);
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  text-align: center;
+}
+
 /* ------------------------------------------------------------------- items */
 .list {
   flex: 1;

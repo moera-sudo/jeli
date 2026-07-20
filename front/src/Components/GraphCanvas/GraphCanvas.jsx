@@ -1,398 +1,506 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ReactFlow, Background, Controls, Panel } from '@xyflow/react'
 
-import { ROUTES, chatPath } from '../../Routes/Routes'
+import PersonNode from './PersonNode'
+import NodeDetailPanel from './NodeDetailPanel'
+import PersonFormModal from './PersonFormModal'
+import Button from '../../UI/Button/Button'
+import Loader from '../../UI/Loader/Loader'
+import { UsersIcon, DownloadIcon, CloseIcon, CheckIcon } from '../../UI/icons'
 import { downloadSvgAsImage } from '../../utils/exportImage'
+import { isValidFamilyCode, normalizeInviteCode } from '../../utils/validation'
+import { buildFlow } from '../../utils/buildFlow'
+import { NODE_SIZE } from '../../utils/radialLayout'
 import {
-  PlusIcon,
-  MinusIcon,
-  UserIcon,
-  UsersIcon,
-  ChatIcon,
-  DownloadIcon,
-} from '../../UI/icons'
+  getGraph,
+  getPerson,
+  createPerson,
+  updatePerson,
+  deletePerson,
+  generateInviteCode,
+  getSuccessorCandidates,
+  createMarriageProposal,
+} from '../../api/graphService'
 import styles from './GraphCanvas.module.css'
 
-/* ------------------------------------------------------------------ data ---
-   The graph is data-driven so the interactive DOM view and the raster export
-   are generated from one source of truth. Coordinates live in a fixed
-   840×470 stage; Y encodes generations (fixed by the backend), the union-node
-   pattern (docs/dag-page.md) keeps the edges from crossing. */
+// Stable identity — React Flow warns if nodeTypes is rebuilt each render.
+const nodeTypes = { person: PersonNode }
 
-const NODE_W = 156
-const NODE_H = 62
-
-const NODES = [
-  { id: 'asan', name: 'Асан', relation: 'Дедушка', years: '1938–2009', birth: 'с. Каскелен', state: 'deceased', x: 170, y: 30 },
-  { id: 'aigul', name: 'Айгүл', relation: 'Бабушка', years: '1942–2015', birth: 'г. Талдыкорган', state: 'deceased', x: 430, y: 30 },
-  { id: 'beknur', name: 'Бекнұр', relation: 'Вы', years: 'р. 1994', birth: 'г. Алматы', state: 'registered', x: 150, y: 210, you: true },
-  { id: 'dinara', name: 'Динара', relation: 'Супруга', years: 'р. 1996', birth: 'г. Тараз', state: 'unregistered', x: 470, y: 210 },
-  { id: 'erlan', name: 'Ерлан', relation: 'Сын', years: 'р. 2018', birth: 'г. Алматы', state: 'registered', x: 210, y: 390 },
-  { id: 'maya', name: 'Мая', relation: 'Дочь', years: 'р. 2021', birth: 'г. Алматы', state: 'unregistered', x: 480, y: 390 },
-]
-
-const EDGE_PATHS = [
-  'M248 92 L378 140', // Асан → U1
-  'M508 92 L378 140', // Айгүл → U1
-  'M378 140 L228 210', // U1 → Бекнұр
-  'M228 272 L423 320', // Бекнұр → U2
-  'M548 272 L423 320', // Динара → U2
-  'M423 320 L288 390', // U2 → Ерлан
-  'M423 320 L558 390', // U2 → Мая
-]
-
-const UNIONS = [
-  { x: 378, y: 140 },
-  { x: 423, y: 320 },
-]
-
-const RELATIVE_ACTIONS = ['+ Отец', '+ Мать', '+ Супруг(а)', '+ Ребёнок', '+ Брат/сестра']
-
-const ZOOM_MIN = 0.5
-const ZOOM_MAX = 2
-const ZOOM_STEP = 0.15
-
-/* --------------------------------------------------------- person node --- */
-function PersonNode({ node, onEnter, onLeave, onContext }) {
-  const className = [styles.node, styles[node.state], node.you ? styles.nodeSelected : '']
-    .filter(Boolean)
-    .join(' ')
-
-  return (
-    <div
-      className={className}
-      style={{ left: node.x, top: node.y }}
-      onMouseEnter={(e) => onEnter(node, e.currentTarget)}
-      onMouseLeave={onLeave}
-      onContextMenu={(e) => onContext(node, e)}
-    >
-      <span className={styles.nodeAvatar} aria-hidden="true">
-        <UserIcon />
-        {node.state !== 'deceased' && (
-          <span className={`${styles.status} ${styles[`status_${node.state}`]}`} />
-        )}
-      </span>
-      <span className={styles.nodeText}>
-        <span className={styles.nodeName}>{node.name}</span>
-        <span className={styles.nodeMeta}>{node.relation}</span>
-      </span>
-    </div>
-  )
+const RELATION_TITLES = {
+  parent: 'Добавить родителя',
+  child: 'Добавить ребёнка',
+  spouse: 'Добавить супруга(у)',
 }
 
-/* --------------------------------------------------- raster export (svg) ---
-   Rebuilds the graph as a self-contained SVG string, then rasterises it to a
-   PNG/JPEG via a canvas — no external libraries. */
+/* ------------------------------------------------- SVG export (raster) --- */
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-// * PNG exports transparent and without the heading; JPEG keeps the white
-// * background and "Родовое древо" title.
-function buildSvg(format) {
-  const bare = format === 'png'
-  const W = 840
-  const H = 500
-  const edges = EDGE_PATHS.map((d) => `<path d="${d}" fill="none" stroke="rgba(26,26,26,0.28)" stroke-width="2"/>`).join('')
-  const unions = UNIONS.map((u) => `<circle cx="${u.x}" cy="${u.y}" r="5" fill="#8a8a8a"/>`).join('')
+// Rebuilds the current layout as a self-contained SVG string for rasterising.
+function buildSvg(nodes, edges) {
+  if (!nodes.length) return '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"></svg>'
+  const pad = 60
+  const xs = nodes.map((n) => n.position.x)
+  const ys = nodes.map((n) => n.position.y)
+  const minX = Math.min(...xs) - pad
+  const minY = Math.min(...ys) - pad
+  const maxX = Math.max(...xs) + NODE_SIZE.width + pad
+  const maxY = Math.max(...ys) + NODE_SIZE.height + pad
+  const W = Math.round(maxX - minX)
+  const H = Math.round(maxY - minY)
 
-  const cards = NODES.map((n) => {
-    const cx = n.x + 31
-    const cy = n.y + 31
-    const nameFill = n.state === 'deceased' ? '#8a8a8a' : '#1a1a1a'
-    const dot =
-      n.state === 'registered'
-        ? `<circle cx="${cx + 13}" cy="${cy + 13}" r="5.5" fill="#22c55e" stroke="#fff" stroke-width="2"/>`
-        : n.state === 'unregistered'
-          ? `<circle cx="${cx + 13}" cy="${cy + 13}" r="5.5" fill="#8a8a8a" stroke="#fff" stroke-width="2"/>`
-          : ''
-    return `
-      <g>
-        <rect x="${n.x}" y="${n.y}" width="${NODE_W}" height="${NODE_H}" rx="8"
-          fill="#ffffff" stroke="${n.you ? '#ff7648' : 'rgba(26,26,26,0.12)'}" stroke-width="${n.you ? 2 : 1}"/>
-        <circle cx="${cx}" cy="${cy}" r="19" fill="#f0f0f1"/>
-        <text x="${cx}" y="${cy + 5}" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="600" fill="#8a8a8a">${esc(n.name[0])}</text>
-        ${dot}
-        <text x="${n.x + 62}" y="${n.y + 28}" font-family="sans-serif" font-size="15" font-weight="600" fill="${nameFill}">${esc(n.name)}</text>
-        <text x="${n.x + 62}" y="${n.y + 45}" font-family="sans-serif" font-size="11" fill="#8a8a8a">${esc(n.relation)}</text>
-      </g>`
-  }).join('')
+  const center = (n) => ({
+    x: n.position.x - minX + NODE_SIZE.width / 2,
+    y: n.position.y - minY + NODE_SIZE.height / 2,
+  })
+  const byId = new Map(nodes.map((n) => [n.id, n]))
 
-  const background = bare ? '' : `<rect width="${W}" height="${H}" fill="#ffffff"/>`
-  const heading = bare
-    ? ''
-    : `<text x="24" y="34" font-family="sans-serif" font-size="16" font-weight="700" fill="#1a1a1a">Родовое древо</text>`
+  const edgeSvg = edges
+    .map((e) => {
+      const a = byId.get(e.source)
+      const b = byId.get(e.target)
+      if (!a || !b) return ''
+      const pa = center(a)
+      const pb = center(b)
+      const dash = e.style?.strokeDasharray ? ` stroke-dasharray="${e.style.strokeDasharray}"` : ''
+      return `<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" stroke="${e.style?.stroke ?? '#999'}" stroke-width="2"${dash}/>`
+    })
+    .join('')
+
+  const nodeSvg = nodes
+    .map((n) => {
+      const p = n.person ?? n.data.person
+      const x = n.position.x - minX
+      const y = n.position.y - minY
+      const isFocus = n.data.isFocus
+      const deceased = !p.is_alive
+      const nameFill = deceased ? '#8a8a8a' : '#1a1a1a'
+      const initial = esc((p.full_name || '?').trim()[0] || '?')
+      return `
+        <g>
+          <rect x="${x}" y="${y}" width="${NODE_SIZE.width}" height="${NODE_SIZE.height}" rx="14"
+            fill="#ffffff" stroke="${isFocus ? '#ff7648' : 'rgba(26,26,26,0.12)'}" stroke-width="${isFocus ? 2.5 : 1}"/>
+          <circle cx="${x + 34}" cy="${y + NODE_SIZE.height / 2}" r="22" fill="#f0f0f1"/>
+          <text x="${x + 34}" y="${y + NODE_SIZE.height / 2 + 6}" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="600" fill="#8a8a8a">${initial}</text>
+          <text x="${x + 66}" y="${y + NODE_SIZE.height / 2 + 5}" font-family="sans-serif" font-size="15" font-weight="600" fill="${nameFill}">${esc(p.full_name)}</text>
+        </g>`
+    })
+    .join('')
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-    ${background}
-    ${heading}
-    <g transform="translate(0,10)">${edges}${unions}${cards}</g>
+    <rect width="${W}" height="${H}" fill="#fafafa"/>
+    <g>${edgeSvg}${nodeSvg}</g>
   </svg>`
 }
 
-/* ============================================================ component === */
-export default function GraphCanvas() {
-  const canvasRef = useRef(null)
-  const hideTimer = useRef(null)
+/* ======================================================== component ===== */
+export default function GraphCanvas({ focusPerson, onGraphChanged }) {
+  const focusId = focusPerson.id
 
-  const [zoom, setZoom] = useState(1)
-  const [fullscreen, setFullscreen] = useState(false)
-  const [hovered, setHovered] = useState(null) // { node, left, top }
-  const [menu, setMenu] = useState(null) // { node, left, top }
-  const [exportOpen, setExportOpen] = useState(false)
-  const [exporting, setExporting] = useState(false)
-  const [zoomVisible, setZoomVisible] = useState(false)
-  const firstZoomRender = useRef(true)
+  const [graph, setGraph] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [depth, setDepth] = useState(3)
 
-  const zoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2)))
-  const zoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, +(z - ZOOM_STEP).toFixed(2)))
+  const [selectedId, setSelectedId] = useState(null)
+  const [detail, setDetail] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
-  // Reveal the zoom readout only while the user is changing the zoom; fade it
-  // back out after a short idle. Skips the initial render so it stays hidden
-  // until the first zoom action.
-  useEffect(() => {
-    if (firstZoomRender.current) {
-      firstZoomRender.current = false
-      return
+  const [modal, setModal] = useState(null) // { kind, ... }
+  const [toast, setToast] = useState('')
+  const toastTimer = useRef(null)
+
+  const flash = useCallback((message) => {
+    setToast(message)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(''), 3000)
+  }, [])
+
+  /* ------------------------------------------------------------ data --- */
+  const loadGraph = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const data = await getGraph(focusId, depth)
+      setGraph(data)
+    } catch (err) {
+      setError(err.message || 'Не удалось загрузить дерево')
+    } finally {
+      setLoading(false)
     }
-    setZoomVisible(true)
-    const timer = setTimeout(() => setZoomVisible(false), 1200)
-    return () => clearTimeout(timer)
-  }, [zoom])
+  }, [focusId, depth])
 
-  // Rasterise + download the whole tree without blocking the UI thread, so the
-  // user can keep interacting while the file is prepared and saved.
-  const handleExport = useCallback(async (format) => {
-    setExportOpen(false)
+  useEffect(() => {
+    loadGraph()
+  }, [loadGraph])
+
+  const loadDetail = useCallback(async (id) => {
+    setDetailLoading(true)
+    try {
+      setDetail(await getPerson(id))
+    } catch (err) {
+      flash(err.message || 'Не удалось загрузить карточку')
+    } finally {
+      setDetailLoading(false)
+    }
+  }, [flash])
+
+  const { nodes, edges } = useMemo(() => {
+    if (!graph) return { nodes: [], edges: [] }
+    const flow = buildFlow(graph)
+    // Fold selection into node state (we drive selection ourselves).
+    flow.nodes = flow.nodes.map((n) => ({ ...n, selected: n.id === selectedId }))
+    return flow
+  }, [graph, selectedId])
+
+  const hasMore = useMemo(
+    () => (graph?.persons ?? []).some((p) => p.has_more_ancestors),
+    [graph],
+  )
+
+  /* -------------------------------------------------------- selection --- */
+  const handleNodeClick = useCallback((_, node) => {
+    setSelectedId(node.id)
+    setDetail(null)
+    loadDetail(node.id)
+  }, [loadDetail])
+
+  const clearSelection = useCallback(() => {
+    setSelectedId(null)
+    setDetail(null)
+  }, [])
+
+  /* ------------------------------------------------------- mutations --- */
+  const afterMutation = useCallback(async (message) => {
+    setModal(null)
+    if (message) flash(message)
+    await loadGraph()
+    if (selectedId) loadDetail(selectedId)
+  }, [flash, loadGraph, selectedId, loadDetail])
+
+  const handleAddRelative = (type) =>
+    setModal({ kind: 'add', relationType: type, targetId: selectedId })
+
+  const submitAdd = async (values) => {
+    await createPerson({
+      ...values,
+      relation: { to_person_id: modal.targetId, type: modal.relationType },
+    })
+    await afterMutation(
+      modal.relationType === 'spouse'
+        ? 'Готово. Если супруг(а) из другой семьи — отправлен запрос на связь.'
+        : 'Родственник добавлен',
+    )
+  }
+
+  const submitEdit = async (values) => {
+    await updatePerson(detail.id, values)
+    await afterMutation('Изменения сохранены')
+  }
+
+  const handleRemove = () => setModal({ kind: 'confirmRemove' })
+
+  const runRemove = async (newOwnerUserId) => {
+    const id = detail.id
+    const removingSelf = detail.linked_user_id === focusPerson.linked_user_id
+    try {
+      await deletePerson(id, newOwnerUserId)
+      setModal(null)
+      clearSelection()
+      flash('Родственник удалён')
+      if (removingSelf) {
+        onGraphChanged?.()
+      } else {
+        await loadGraph()
+      }
+    } catch (err) {
+      if (err.status === 409) {
+        // Self-delete needs a successor — offer the picker.
+        try {
+          const candidates = await getSuccessorCandidates()
+          if (candidates.length) {
+            setModal({ kind: 'successor', candidates })
+            return
+          }
+        } catch { /* fall through to the generic error */ }
+      }
+      flash(err.message || 'Не удалось удалить')
+    }
+  }
+
+  const handleInvite = async () => {
+    try {
+      const code = await generateInviteCode(detail.id)
+      setModal({ kind: 'invite', code })
+    } catch (err) {
+      flash(err.message || 'Не удалось получить код')
+    }
+  }
+
+  const submitMerge = async (code) => {
+    await createMarriageProposal({ person_a_id: focusId, target_invite_code: code })
+    setModal(null)
+    flash('Запрос на связь семей отправлен. Ожидайте подтверждения.')
+  }
+
+  /* ---------------------------------------------------------- export --- */
+  const [exporting, setExporting] = useState(false)
+  const handleExport = async () => {
     setExporting(true)
     try {
-      await downloadSvgAsImage(buildSvg(format), { format, fileName: 'family-tree' })
+      await downloadSvgAsImage(buildSvg(nodes, edges), { format: 'png', fileName: 'family-tree' })
     } finally {
       setExporting(false)
     }
-  }, [])
-
-  const toggleFullscreen = () => {
-    const el = canvasRef.current
-    if (!el) return
-    if (document.fullscreenElement) {
-      document.exitFullscreen()
-    } else {
-      el.requestFullscreen?.()
-    }
   }
 
-  useEffect(() => {
-    const onChange = () => setFullscreen(Boolean(document.fullscreenElement))
-    document.addEventListener('fullscreenchange', onChange)
-    return () => document.removeEventListener('fullscreenchange', onChange)
-  }, [])
+  useEffect(() => () => toastTimer.current && clearTimeout(toastTimer.current), [])
 
-  // Overlays are fixed-positioned in viewport space (so the canvas's
-  // overflow:hidden can't clip them); live DOM rects keep them aligned at any
-  // zoom level and in fullscreen.
-  const handleEnter = useCallback((node, target) => {
-    if (hideTimer.current) clearTimeout(hideTimer.current)
-    const r = target.getBoundingClientRect()
-    setHovered({ node, left: r.left + r.width / 2, top: r.top })
-  }, [])
-
-  const handleLeave = useCallback(() => {
-    hideTimer.current = setTimeout(() => setHovered(null), 120)
-  }, [])
-
-  const keepCard = () => {
-    if (hideTimer.current) clearTimeout(hideTimer.current)
+  /* ------------------------------------------------------------ render --- */
+  if (loading && !graph) {
+    return <div className={styles.canvas}><Loader /></div>
   }
-
-  const handleContext = useCallback((node, e) => {
-    e.preventDefault()
-    setHovered(null)
-    // Clamp to the viewport so the menu never runs off-screen.
-    const left = Math.min(e.clientX, window.innerWidth - 212)
-    const top = Math.min(e.clientY, window.innerHeight - 260)
-    setMenu({ node, left: Math.max(8, left), top: Math.max(8, top) })
-  }, [])
-
-  // Dismiss the context menu / export popover on any outside interaction.
-  useEffect(() => {
-    if (!menu && !exportOpen) return
-    const close = () => {
-      setMenu(null)
-      setExportOpen(false)
-    }
-    const onKey = (e) => e.key === 'Escape' && close()
-    window.addEventListener('pointerdown', close)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('pointerdown', close)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [menu, exportOpen])
+  if (error) {
+    return (
+      <div className={styles.canvas}>
+        <div className={styles.centerMessage}>
+          <p>{error}</p>
+          <Button variant="accent" size="sm" onClick={loadGraph}>Повторить</Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className={styles.canvas} ref={canvasRef}>
-      {/* Generation rail. */}
-      <div className={styles.rail} aria-hidden="true">
-        <span className={styles.railTick} style={{ top: 61 }}>I</span>
-        <span className={styles.railTick} style={{ top: 241 }}>II</span>
-        <span className={styles.railTick} style={{ top: 421 }}>III</span>
-      </div>
-
-      {/* Zoomable stage. */}
-      <div
-        className={styles.stage}
-        style={{ transform: `translate(-50%, -50%) scale(${zoom})` }}
+    <div className={styles.canvas}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onNodeClick={handleNodeClick}
+        onPaneClick={clearSelection}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable
+        onlyRenderVisibleElements
+        fitView
+        minZoom={0.2}
+        maxZoom={2}
+        proOptions={{ hideAttribution: true }}
       >
-        <svg className={styles.edges} viewBox="0 0 840 470" preserveAspectRatio="xMidYMid meet">
-          {EDGE_PATHS.map((d) => (
-            <path key={d} d={d} />
-          ))}
-          {UNIONS.map((u) => (
-            <circle key={`${u.x}-${u.y}`} className={styles.union} cx={u.x} cy={u.y} r="5" />
-          ))}
-        </svg>
+        <Background gap={28} color="#e7e7e9" />
+        <Controls showInteractive={false} />
 
-        {NODES.map((node) => (
-          <PersonNode
-            key={node.id}
-            node={node}
-            onEnter={handleEnter}
-            onLeave={handleLeave}
-            onContext={handleContext}
-          />
-        ))}
-      </div>
-
-      {/* Hover info modal. */}
-      {hovered && (
-        <div
-          className={styles.hoverCard}
-          style={{ left: hovered.left, top: hovered.top }}
-          onMouseEnter={keepCard}
-          onMouseLeave={handleLeave}
-        >
-          <div className={styles.hoverHead}>
-            <span className={`${styles.hoverAvatar} ${styles[hovered.node.state]}`} aria-hidden="true">
-              <UserIcon />
-            </span>
-            <div>
-              <p className={styles.hoverName}>{hovered.node.name}</p>
-              <p className={styles.hoverRelation}>{hovered.node.relation}</p>
-            </div>
-          </div>
-          <dl className={styles.hoverMeta}>
-            <div><dt>Годы</dt><dd>{hovered.node.years}</dd></div>
-            <div><dt>Место рождения</dt><dd>{hovered.node.birth}</dd></div>
-          </dl>
-          {hovered.node.state === 'registered' && !hovered.node.you && (
-            <Link to={chatPath(hovered.node.id)} className={styles.hoverChat}>
-              <ChatIcon /> Начать чат
-            </Link>
-          )}
-          {hovered.node.you && (
-            <Link to={ROUTES.profile} className={styles.hoverProfile}>
-              Открыть профиль
-            </Link>
-          )}
-          {hovered.node.state === 'unregistered' && (
-            <button type="button" className={styles.hoverInvite}>Пригласить</button>
-          )}
-          {hovered.node.state === 'deceased' && (
-            <p className={styles.hoverMemorial}>Мемориальная страница</p>
-          )}
-        </div>
-      )}
-
-      {/* Right-click: add-relative menu. */}
-      {menu && (
-        <div
-          className={styles.menu}
-          style={{ left: menu.left, top: menu.top }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <p className={styles.menuTitle}>{menu.node.name} · добавить</p>
-          {RELATIVE_ACTIONS.map((label) => (
+        <Panel position="top-left" className={styles.toolbar}>
+          {hasMore && (
             <button
-              key={label}
               type="button"
-              className={styles.menuItem}
-              onClick={() => setMenu(null)}
+              className={styles.toolbarBtn}
+              onClick={() => setDepth((d) => Math.min(8, d + 2))}
             >
-              {label}
+              <UsersIcon /> Показать ещё поколение
             </button>
-          ))}
-        </div>
+          )}
+          <button type="button" className={styles.toolbarBtn} onClick={() => setModal({ kind: 'merge' })}>
+            <UsersIcon /> Связать с другой семьёй
+          </button>
+          <button type="button" className={styles.toolbarBtn} onClick={handleExport} disabled={exporting}>
+            <DownloadIcon /> {exporting ? 'Экспорт…' : 'Скачать PNG'}
+          </button>
+        </Panel>
+
+        <Panel position="bottom-right" className={styles.legend}>
+          <span className={styles.legendItem}><span className={`${styles.dot} ${styles.status_registered}`} /> В приложении</span>
+          <span className={styles.legendItem}><span className={`${styles.dot} ${styles.status_unregistered}`} /> Не в приложении</span>
+          <span className={styles.legendItem}><span className={`${styles.dot} ${styles.status_deceased}`} /> Умерший</span>
+        </Panel>
+      </ReactFlow>
+
+      {selectedId && (
+        <NodeDetailPanel
+          detail={detail}
+          loading={detailLoading}
+          callbacks={{
+            onAddRelative: handleAddRelative,
+            onEdit: () => setModal({ kind: 'edit' }),
+            onRemove: handleRemove,
+            onInvite: handleInvite,
+            onClose: clearSelection,
+          }}
+        />
       )}
 
-      {/* Controls: zoom, fit, fullscreen, export. */}
-      <div className={styles.controls}>
-        <button type="button" className={styles.control} onClick={zoomIn} aria-label="Приблизить"><PlusIcon /></button>
-        <button type="button" className={styles.control} onClick={zoomOut} aria-label="Отдалить"><MinusIcon /></button>
-        <button
-          type="button"
-          className={`${styles.control} ${fullscreen ? styles.controlActive : ''}`}
-          onClick={toggleFullscreen}
-          aria-label={fullscreen ? 'Выйти из полноэкранного режима' : 'Во весь экран'}
-        >
-          <FullscreenIcon />
-        </button>
-        <div className={styles.exportWrap} onPointerDown={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            className={`${styles.control} ${exportOpen ? styles.controlActive : ''}`}
-            onClick={() => setExportOpen((v) => !v)}
-            disabled={exporting}
-            aria-label="Экспорт древа"
-            aria-expanded={exportOpen}
-          >
-            <DownloadIcon />
+      {/* --------------------------------------------------------- modals */}
+      {modal?.kind === 'add' && (
+        <PersonFormModal
+          title={RELATION_TITLES[modal.relationType]}
+          submitLabel="Добавить"
+          onSubmit={submitAdd}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal?.kind === 'edit' && detail && (
+        <PersonFormModal
+          title="Изменить данные"
+          submitLabel="Сохранить"
+          initial={detail}
+          onSubmit={submitEdit}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal?.kind === 'confirmRemove' && (
+        <ConfirmRemoveModal
+          name={detail?.full_name}
+          onConfirm={() => runRemove()}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal?.kind === 'successor' && (
+        <SuccessorModal
+          candidates={modal.candidates}
+          onPick={(userId) => runRemove(userId)}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal?.kind === 'invite' && (
+        <InviteCodeModal code={modal.code} onClose={() => setModal(null)} onCopied={() => flash('Код скопирован')} />
+      )}
+
+      {modal?.kind === 'merge' && (
+        <MergeModal onSubmit={submitMerge} onClose={() => setModal(null)} />
+      )}
+
+      {toast && <div className={styles.toast} role="status">{toast}</div>}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------- small modals --- */
+function ModalShell({ title, onClose, children }) {
+  return (
+    <div className={styles.modalBackdrop} onPointerDown={onClose}>
+      <div className={styles.modalCard} role="dialog" aria-label={title} onPointerDown={(e) => e.stopPropagation()}>
+        <header className={styles.modalHead}>
+          <h3 className={styles.modalTitle}>{title}</h3>
+          <button type="button" className={styles.modalClose} aria-label="Закрыть" onClick={onClose}>
+            <CloseIcon />
           </button>
-          {exportOpen && (
-            <div className={styles.exportMenu} role="menu">
-              <span className={styles.exportHint}>Скачать как</span>
-              <button type="button" role="menuitem" onClick={() => handleExport('png')}>PNG</button>
-              <button type="button" role="menuitem" onClick={() => handleExport('jpeg')}>JPEG</button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Zoom readout — visible only while zooming. */}
-      <span className={`${styles.zoomBadge} ${zoomVisible ? styles.zoomBadgeVisible : ''}`} aria-hidden={!zoomVisible}>
-        {Math.round(zoom * 100)}%
-      </span>
-
-      {/* Load-more generations. */}
-      <button type="button" className={styles.loadMore}>
-        <UsersIcon />
-        Показать ещё поколение
-      </button>
-
-      {/* Card-state legend. */}
-      <div className={styles.legend}>
-        <span className={styles.legendItem}>
-          <span className={`${styles.dot} ${styles.status_registered}`} />
-          В приложении — профиль и чат
-        </span>
-        <span className={styles.legendItem}>
-          <span className={`${styles.dot} ${styles.status_unregistered}`} />
-          Не в приложении — пригласить
-        </span>
-        <span className={styles.legendItem}>
-          <span className={`${styles.dot} ${styles.dotDeceased}`} />
-          Умерший — мемориал
-        </span>
+        </header>
+        {children}
       </div>
     </div>
   )
 }
 
-/* Fullscreen toggle glyph (local to keep the shared icon set lean). */
-function FullscreenIcon(props) {
+function ConfirmRemoveModal({ name, onConfirm, onClose }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
-      <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <ModalShell title="Удалить родственника" onClose={onClose}>
+      <p className={styles.modalText}>
+        Удалить «{name}» из дерева? Если к узлу привязан аккаунт, он будет только отвязан, а данные сохранятся.
+      </p>
+      <div className={styles.modalActions}>
+        <Button variant="primary" size="sm" onClick={onClose}>Отмена</Button>
+        <Button variant="danger" size="sm" onClick={onConfirm}>Удалить</Button>
+      </div>
+    </ModalShell>
+  )
+}
+
+function SuccessorModal({ candidates, onPick, onClose }) {
+  const [picked, setPicked] = useState(candidates[0]?.id ?? '')
+  return (
+    <ModalShell title="Кому передать управление" onClose={onClose}>
+      <p className={styles.modalText}>
+        Вы удаляете свой узел. Выберите, кто станет владельцем дерева.
+      </p>
+      <ul className={styles.pickerList}>
+        {candidates.map((c) => (
+          <li key={c.id}>
+            <label className={styles.pickerItem}>
+              <input type="radio" name="successor" checked={picked === c.id} onChange={() => setPicked(c.id)} />
+              {c.avatar_url && <img src={c.avatar_url} alt="" className={styles.pickerAvatar} />}
+              <span>{c.full_name}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <div className={styles.modalActions}>
+        <Button variant="primary" size="sm" onClick={onClose}>Отмена</Button>
+        <Button variant="danger" size="sm" disabled={!picked} onClick={() => onPick(picked)}>
+          Передать и удалить
+        </Button>
+      </div>
+    </ModalShell>
+  )
+}
+
+function InviteCodeModal({ code, onClose, onCopied }) {
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code)
+      onCopied()
+    } catch { /* clipboard may be blocked; the code is shown for manual copy */ }
+  }
+  return (
+    <ModalShell title="Код приглашения" onClose={onClose}>
+      <p className={styles.modalText}>
+        Передайте этот код родственнику — он введёт его при регистрации или на экране «Присоединиться».
+      </p>
+      <div className={styles.codeBox}>{code}</div>
+      <div className={styles.modalActions}>
+        <Button variant="accent" size="sm" trailingIcon={<CheckIcon />} onClick={copy}>Скопировать</Button>
+      </div>
+    </ModalShell>
+  )
+}
+
+function MergeModal({ onSubmit, onClose }) {
+  const [code, setCode] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const valid = isValidFamilyCode(code)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!valid || submitting) return
+    setError('')
+    setSubmitting(true)
+    try {
+      await onSubmit(code)
+    } catch (err) {
+      setError(err.message || 'Не удалось отправить запрос')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <ModalShell title="Связать с другой семьёй" onClose={onClose}>
+      <form className={styles.modalForm} onSubmit={submit} noValidate>
+        <p className={styles.modalText}>
+          Введите код приглашения узла другой семьи. После подтверждения их администратором деревья станут видны друг другу.
+        </p>
+        <input
+          className={styles.formInput}
+          value={code}
+          onChange={(e) => setCode(normalizeInviteCode(e.target.value))}
+          placeholder="8-значный код"
+          autoCapitalize="characters"
+          autoComplete="off"
+          autoFocus
+        />
+        {error && <p className={styles.formError} role="alert">{error}</p>}
+        <div className={styles.modalActions}>
+          <Button type="button" variant="primary" size="sm" onClick={onClose}>Отмена</Button>
+          <Button type="submit" variant="accent" size="sm" disabled={!valid || submitting}>
+            {submitting ? 'Отправка…' : 'Отправить запрос'}
+          </Button>
+        </div>
+      </form>
+    </ModalShell>
   )
 }

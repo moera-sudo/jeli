@@ -21,11 +21,28 @@ export function isValidPassword(value) {
 }
 
 /**
- * Family invite code: exactly 6 digits.
+ * Family invite code: exactly 8 Crockford Base32 characters.
+ * The backend uses `0-9` + `A-Z` minus the ambiguous `I`, `L`, `O`, `U`
+ * (see docs/graph-api.md). Codes are shared as plain text.
  *
  * @param {string} value
  * @returns {boolean}
  */
 export function isValidFamilyCode(value) {
-  return /^\d{6}$/.test(value)
+  return /^[0-9A-HJ-NP-TV-Z]{8}$/.test(value)
+}
+
+/**
+ * Normalizes raw user input into a candidate invite code: uppercases, drops any
+ * character outside the Crockford Base32 alphabet, and caps the length at 8.
+ * Shared by the registration form and the "Join a tree" screen.
+ *
+ * @param {string} raw
+ * @returns {string}
+ */
+export function normalizeInviteCode(raw) {
+  return String(raw ?? '')
+    .toUpperCase()
+    .replace(/[^0-9A-HJ-NP-TV-Z]/g, '')
+    .slice(0, 8)
 }

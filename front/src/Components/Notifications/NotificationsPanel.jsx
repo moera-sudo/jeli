@@ -1,53 +1,63 @@
-import { CloseIcon, UsersIcon, ChatIcon, BellIcon, UserIcon } from '../../UI/icons'
+import { useEffect, useState } from 'react'
+
+import { CloseIcon, UsersIcon, CheckIcon, BellIcon } from '../../UI/icons'
+import { getMarriageProposals } from '../../api/graphService'
+import { useAuth } from '../../auth/AuthContext'
 import styles from './NotificationsPanel.module.css'
 
 /**
  * Notifications modal — a tall panel that slides in from the right edge.
- * Opening the panel counts as reading everything (the header handles the
- * "seen" state), so items are shown without an unread treatment.
- * Layout only: the items are static sample data.
  *
- * @param {object}     props
- * @param {boolean}    props.open     Whether the panel is shown.
- * @param {() => void} props.onClose  Dismisses the panel.
+ * There is no dedicated notifications backend yet, so items are derived
+ * best-effort from the user's marriage/merge proposals (`GET /marriage-proposals`):
+ * the outcome of a request the user sent, and any new incoming request. The
+ * list is fetched when the panel opens and tolerates an empty result.
  */
 
-const NOTIFICATIONS = [
-  {
-    id: 1,
-    icon: <UsersIcon />,
-    tone: 'match',
-    title: 'Найден возможный родственник',
-    text: 'Динара Ахметова совпадает с вашим древом по роду Ботбай.',
-    time: '5 мин назад',
-  },
-  {
-    id: 2,
-    icon: <ChatIcon />,
-    tone: 'chat',
-    title: 'Новое сообщение',
-    text: 'Ерлан: «Ассалаумағалейкум, нашёл общего предка!»',
-    time: '20 мин назад',
-  },
-  {
-    id: 3,
-    icon: <UserIcon />,
-    tone: 'invite',
-    title: 'Приглашение принято',
-    text: 'Асель Серікова присоединилась к вашему древу.',
-    time: '2 ч назад',
-  },
-  {
-    id: 4,
-    icon: <BellIcon />,
-    tone: 'system',
-    title: 'Древо обновлено',
-    text: 'Добавлено новое поколение — 3 родственника.',
-    time: 'Вчера',
-  },
-]
+/** Turns a proposal into a notification descriptor, relative to the viewer. */
+function toNotification(proposal, userId) {
+  const outgoing = proposal.proposer_user_id === userId
+  if (proposal.status === 'confirmed') {
+    return {
+      tone: 'invite',
+      icon: <CheckIcon />,
+      title: outgoing ? 'Запрос на связь принят' : 'Связь семей подтверждена',
+      text: 'Деревья двух семей теперь видны друг другу.',
+    }
+  }
+  if (proposal.status === 'rejected' && outgoing) {
+    return { tone: 'system', icon: <BellIcon />, title: 'Запрос на связь отклонён', text: 'Другая семья отклонила ваш запрос.' }
+  }
+  if (proposal.status === 'pending') {
+    return outgoing
+      ? { tone: 'system', icon: <UsersIcon />, title: 'Запрос отправлен', text: 'Ожидает подтверждения другой семьи.' }
+      : { tone: 'match', icon: <UsersIcon />, title: 'Новый запрос на связь семей', text: 'Подтвердите его во вкладке «Запросы».' }
+  }
+  return null
+}
 
 export default function NotificationsPanel({ open, onClose }) {
+  const { user } = useAuth()
+  const [items, setItems] = useState([])
+
+  useEffect(() => {
+    if (!open || !user) return
+    let active = true
+    getMarriageProposals()
+      .then((proposals) => {
+        if (!active) return
+        setItems(
+          proposals
+            .map((p) => ({ id: p.id, ...toNotification(p, user.id) }))
+            .filter((n) => n.title),
+        )
+      })
+      .catch(() => active && setItems([]))
+    return () => {
+      active = false
+    }
+  }, [open, user])
+
   return (
     <>
       <div
@@ -62,7 +72,6 @@ export default function NotificationsPanel({ open, onClose }) {
         aria-label="Уведомления"
         aria-hidden={!open}
       >
-        {/* ------------------------------------------------------------- head */}
         <header className={styles.head}>
           <h2 className={styles.title}>Уведомления</h2>
           <button type="button" className={styles.close} aria-label="Закрыть" onClick={onClose}>
@@ -70,21 +79,23 @@ export default function NotificationsPanel({ open, onClose }) {
           </button>
         </header>
 
-        {/* ------------------------------------------------------------ items */}
-        <ul className={styles.list}>
-          {NOTIFICATIONS.map((n) => (
-            <li key={n.id} className={styles.item}>
-              <span className={`${styles.itemIcon} ${styles[n.tone]}`} aria-hidden="true">
-                {n.icon}
-              </span>
-              <div className={styles.itemBody}>
-                <p className={styles.itemTitle}>{n.title}</p>
-                <p className={styles.itemText}>{n.text}</p>
-                <span className={styles.itemTime}>{n.time}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
+        {items.length === 0 ? (
+          <p className={styles.empty}>Пока нет уведомлений.</p>
+        ) : (
+          <ul className={styles.list}>
+            {items.map((n) => (
+              <li key={n.id} className={styles.item}>
+                <span className={`${styles.itemIcon} ${styles[n.tone]}`} aria-hidden="true">
+                  {n.icon}
+                </span>
+                <div className={styles.itemBody}>
+                  <p className={styles.itemTitle}>{n.title}</p>
+                  <p className={styles.itemText}>{n.text}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </aside>
     </>
   )
