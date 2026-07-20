@@ -4,7 +4,7 @@ import TextField from '../../UI/TextField/TextField'
 import NameFields from '../NameFields/NameFields'
 import Button from '../../UI/Button/Button'
 import { CameraIcon } from '../../UI/icons'
-import { splitFullName, joinFullName } from '../../utils/fullName'
+import { joinFullName, formatPersonName } from '../../utils/fullName'
 // * Shared profile visuals — same stylesheet as the read-only Profile page,
 // * so the editable form looks exactly like the profile itself.
 import styles from '../../Pages/Profile/Profile.module.css'
@@ -37,33 +37,43 @@ const GENDER_OPTIONS = [
 
 /**
  * Initial string state (null/undefined → '') from a user object.
- * The single `full_name` is split into CIS parts (surname/first/middle) for
- * editing.
+ * The stored name columns (last_name/first_name/patronymic) map onto the
+ * editor's surname/firstName/middleName keys.
  */
 function toFormState(source) {
   const base = FIELD_NAMES.reduce((acc, key) => {
     acc[key] = source?.[key] ?? ''
     return acc
   }, {})
-  return { ...base, ...splitFullName(source?.full_name) }
+  return {
+    ...base,
+    surname: source?.last_name ?? '',
+    firstName: source?.first_name ?? '',
+    middleName: source?.patronymic ?? '',
+  }
 }
 
 /**
  * Keeps only non-empty (trimmed) fields for the request.
- * The three name parts are recombined into a single `full_name` string.
+ * The three name parts map back onto the backend columns
+ * (last_name/first_name/patronymic); patronymic is sent as null when cleared.
  * `avatar_url` is intentionally omitted — the avatar is a file upload that the
  * backend does not accept yet (layout only).
  */
-function buildPayload(state, includeFullName) {
+function buildPayload(state, includeName) {
   const payload = FIELD_NAMES.reduce((acc, key) => {
     const value = String(state[key] ?? '').trim()
     if (value) acc[key] = value
     return acc
   }, {})
 
-  if (includeFullName) {
-    const fullName = joinFullName(state)
-    if (fullName) payload.full_name = fullName
+  if (includeName) {
+    const surname = String(state.surname ?? '').trim()
+    const firstName = String(state.firstName ?? '').trim()
+    const middleName = String(state.middleName ?? '').trim()
+    if (surname) payload.last_name = surname
+    if (firstName) payload.first_name = firstName
+    payload.patronymic = middleName || null
   }
 
   return payload
@@ -167,7 +177,7 @@ export default function ProfileEditor({
         </label>
 
         <h1 className={styles.name}>
-          {isEdit ? joinFullName(values) || 'Ваше имя' : initialValues.full_name}
+          {isEdit ? joinFullName(values) || 'Ваше имя' : formatPersonName(initialValues, 'Ваше имя')}
         </h1>
 
         {error && <p className={styles.formError} role="alert">{error}</p>}

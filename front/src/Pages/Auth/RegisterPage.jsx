@@ -9,14 +9,12 @@ import { MailIcon, LockIcon, UsersIcon, ArrowRightIcon } from '../../UI/icons'
 import { ROUTES } from '../../Routes/Routes'
 import { useAuth } from '../../auth/AuthContext'
 import { isValidEmail, isValidPassword, isValidFamilyCode, normalizeInviteCode } from '../../utils/validation'
-import { joinFullName } from '../../utils/fullName'
 import styles from './AuthForm.module.css'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
   const { register } = useAuth()
 
-  // Name in the CIS order: surname · first name · middle name (отчество optional).
   const [name, setName] = useState({ surname: '', firstName: '', middleName: '' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -26,15 +24,11 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
 
-  // Live, per-field validation — messages appear only once a field has content.
   const emailInvalid = email.length > 0 && !isValidEmail(email)
   const passwordInvalid = password.length > 0 && !isValidPassword(password)
   const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== password
   const codeInvalid = hasFamily && familyCode.length > 0 && !isValidFamilyCode(familyCode)
-
-  // Surname and first name are mandatory; middle name (отчество) is optional.
   const nameValid = name.surname.trim().length > 0 && name.firstName.trim().length > 0
-
   const handleNameChange = (field, value) => setName((prev) => ({ ...prev, [field]: value }))
 
   const canSubmit =
@@ -45,7 +39,6 @@ export default function RegisterPage() {
     (!hasFamily || isValidFamilyCode(familyCode)) &&
     !submitting
 
-  // Crockford Base32, upper-cased and capped at 8 characters.
   const handleCodeChange = (event) =>
     setFamilyCode(normalizeInviteCode(event.target.value))
 
@@ -57,13 +50,13 @@ export default function RegisterPage() {
     setSubmitting(true)
     try {
       await register({
-        full_name: joinFullName(name),
+        last_name: name.surname.trim(),
+        first_name: name.firstName.trim(),
+        patronymic: name.middleName.trim() || null,
         email: email.trim(),
         password,
-        // No code → first family member (assigned the family-admin role).
         graph_invite_code: hasFamily ? familyCode : null,
       })
-      // Fresh account → complete the empty profile before entering the app.
       navigate(ROUTES.onboarding, { replace: true })
     } catch (err) {
       setFormError(err.message || 'Не удалось зарегистрироваться')

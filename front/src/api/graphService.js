@@ -52,7 +52,7 @@ export async function joinGraph(inviteCode) {
 
 /**
  * Registered relatives who could take over the graph when the owner leaves.
- * @returns {Promise<object[]>} SuccessorCandidate[] ({ id: userId, full_name, avatar_url }).
+ * @returns {Promise<object[]>} SuccessorCandidate[] ({ id: userId, last_name, first_name, patronymic, avatar_url }).
  */
 export async function getSuccessorCandidates() {
   const { data } = await api.get('/graph/successor-candidates');
@@ -88,7 +88,7 @@ export async function getPerson(id) {
 /**
  * Atomically create a node, optionally wired to an existing one via `relation`.
  *
- * @param {object} payload  { full_name, gender, ...optional,
+ * @param {object} payload  { last_name, first_name, patronymic?, gender, ...optional,
  *   relation?: { to_person_id, type: 'parent'|'child'|'spouse', marriage_year?, marriage_end_reason? } }.
  *   `relation.type` is read relative to `to_person_id`.
  * @returns {Promise<object>} PersonDetail

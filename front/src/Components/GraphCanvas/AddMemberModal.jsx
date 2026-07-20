@@ -4,41 +4,50 @@ import Button from '../../UI/Button/Button'
 import { CloseIcon } from '../../UI/icons'
 import styles from './GraphCanvas.module.css'
 
-const GENDER_OPTIONS = [
-  { value: 'male', label: 'Мужской' },
-  { value: 'female', label: 'Женский' },
+// * Roles offered to the user. Each maps onto a backend relation + gender in
+// * GraphCanvas.submitAdd — the modal itself only collects the choice.
+const ROLES = [
+  { value: 'father', label: 'Отец' },
+  { value: 'mother', label: 'Мать' },
+  { value: 'grandfather', label: 'Дедушка' },
+  { value: 'grandmother', label: 'Бабушка' },
+  { value: 'brother', label: 'Брат' },
+  { value: 'sister', label: 'Сестра' },
+  { value: 'uncle', label: 'Дядя' },
+  { value: 'aunt', label: 'Тётя' },
+  { value: 'spouse', label: 'Супруг(а)' },
+  { value: 'son', label: 'Сын' },
+  { value: 'daughter', label: 'Дочь' },
+  { value: 'grandson', label: 'Внук' },
+  { value: 'granddaughter', label: 'Внучка' },
+  { value: 'nephew', label: 'Племянник' },
+  { value: 'niece', label: 'Племянница' },
 ]
 
 /**
- * Edit-a-node form. Collects the fields the backend needs to patch a Person
- * (`last_name` / `first_name` / `gender` are required; patronymic, birth year
- * and the alive flag are optional). Presentational shell + local state only —
- * the caller performs the API call in `onSubmit` and closes on success.
+ * Right-click modal: add a new family member relative to the clicked node.
+ * A role selector (father/mother/spouse/son/daughter/brother/sister) plus the
+ * fields the backend needs to create a Person (last/first name required,
+ * patronymic + birth year optional). Gender is derived from the role by the
+ * caller, so it is not asked here.
  *
- * @param {object}   props
- * @param {string}   props.title
- * @param {object}   [props.initial]   Prefill { last_name, first_name, patronymic, gender, birth_year_value, is_alive }.
- * @param {string}   props.submitLabel
- * @param {(values: object) => Promise<void>} props.onSubmit
+ * @param {object} props
+ * @param {string} props.targetName                        Display name of the clicked node.
+ * @param {(payload: { role: string, values: object }) => Promise<void>} props.onSubmit
  * @param {() => void} props.onClose
  */
-export default function PersonFormModal({ title, initial = {}, submitLabel, onSubmit, onClose }) {
-  const [lastName, setLastName] = useState(initial.last_name ?? '')
-  const [firstName, setFirstName] = useState(initial.first_name ?? '')
-  const [patronymic, setPatronymic] = useState(initial.patronymic ?? '')
-  const [gender, setGender] = useState(initial.gender ?? '')
-  const [birthYear, setBirthYear] = useState(
-    initial.birth_year_value != null ? String(initial.birth_year_value) : '',
-  )
-  const [isAlive, setIsAlive] = useState(initial.is_alive ?? true)
+export default function AddMemberModal({ targetName, onSubmit, onClose }) {
+  const [role, setRole] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [patronymic, setPatronymic] = useState('')
+  const [birthYear, setBirthYear] = useState('')
+  const [isAlive, setIsAlive] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   const canSubmit =
-    lastName.trim().length > 0 &&
-    firstName.trim().length > 0 &&
-    (gender === 'male' || gender === 'female') &&
-    !submitting
+    role && lastName.trim().length > 0 && firstName.trim().length > 0 && !submitting
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -49,33 +58,51 @@ export default function PersonFormModal({ title, initial = {}, submitLabel, onSu
       const values = {
         last_name: lastName.trim(),
         first_name: firstName.trim(),
-        patronymic: patronymic.trim() || null,
-        gender,
         is_alive: isAlive,
       }
+      const patro = patronymic.trim()
+      if (patro) values.patronymic = patro
       const year = birthYear.trim()
       if (year) {
         values.birth_year_value = Number(year)
         values.birth_year_precision = 'exact'
       }
-      await onSubmit(values)
+      await onSubmit({ role, values })
     } catch (err) {
-      setError(err.message || 'Не удалось сохранить')
+      setError(err.message || 'Не удалось добавить родственника')
       setSubmitting(false)
     }
   }
 
   return (
     <div className={styles.modalBackdrop} onPointerDown={onClose}>
-      <div className={styles.modalCard} role="dialog" aria-label={title} onPointerDown={(e) => e.stopPropagation()}>
+      <div className={styles.modalCard} role="dialog" aria-label="Добавить родственника" onPointerDown={(e) => e.stopPropagation()}>
         <header className={styles.modalHead}>
-          <h3 className={styles.modalTitle}>{title}</h3>
+          <h3 className={styles.modalTitle}>Добавить родственника</h3>
           <button type="button" className={styles.modalClose} aria-label="Закрыть" onClick={onClose}>
             <CloseIcon />
           </button>
         </header>
 
         <form className={styles.modalForm} onSubmit={handleSubmit} noValidate>
+          <div className={styles.formLabel}>
+            <span>Кем приходится «{targetName}» *</span>
+            <div className={styles.roleGrid} role="radiogroup" aria-label="Роль родственника">
+              {ROLES.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={role === value}
+                  className={[styles.roleOpt, role === value ? styles.roleOptActive : ''].filter(Boolean).join(' ')}
+                  onClick={() => setRole(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <label className={styles.formLabel}>
             Фамилия *
             <input
@@ -107,24 +134,6 @@ export default function PersonFormModal({ title, initial = {}, submitLabel, onSu
             />
           </label>
 
-          <div className={styles.formLabel}>
-            <span>Пол *</span>
-            <div className={styles.genderRow} role="radiogroup" aria-label="Пол">
-              {GENDER_OPTIONS.map(({ value, label }) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={gender === value}
-                  className={[styles.genderOpt, gender === value ? styles.genderOptActive : ''].filter(Boolean).join(' ')}
-                  onClick={() => setGender(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <label className={styles.formLabel}>
             Год рождения
             <input
@@ -149,7 +158,7 @@ export default function PersonFormModal({ title, initial = {}, submitLabel, onSu
               Отмена
             </Button>
             <Button type="submit" variant="accent" size="sm" disabled={!canSubmit}>
-              {submitting ? 'Сохранение…' : submitLabel}
+              {submitting ? 'Сохранение…' : 'Добавить'}
             </Button>
           </div>
         </form>

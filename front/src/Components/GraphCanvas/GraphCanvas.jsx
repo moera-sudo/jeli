@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ReactFlow, Background, Controls, Panel } from '@xyflow/react'
+import { useNavigate } from 'react-router-dom'
+import { ReactFlow, Background, Panel, ReactFlowProvider, useReactFlow, useViewport } from '@xyflow/react'
 
 import PersonNode from './PersonNode'
-import NodeDetailPanel from './NodeDetailPanel'
+import UnionNode from './UnionNode'
+import PersonProfileModal from './PersonProfileModal'
 import PersonFormModal from './PersonFormModal'
+import AddMemberModal from './AddMemberModal'
 import Button from '../../UI/Button/Button'
 import Loader from '../../UI/Loader/Loader'
-import { UsersIcon, DownloadIcon, CloseIcon, CheckIcon } from '../../UI/icons'
+import { UsersIcon, DownloadIcon, CloseIcon, CheckIcon, PlusIcon, MinusIcon } from '../../UI/icons'
 import { downloadSvgAsImage } from '../../utils/exportImage'
-import { isValidFamilyCode, normalizeInviteCode } from '../../utils/validation'
-import { buildFlow } from '../../utils/buildFlow'
-import { NODE_SIZE } from '../../utils/radialLayout'
+import { buildFlow, NODE_SIZE, UNION_SIZE } from '../../utils/buildFlow'
+import { formatPersonName } from '../../utils/fullName'
+import { ROUTES } from '../../Routes/Routes'
 import {
   getGraph,
   getPerson,
@@ -19,41 +22,45 @@ import {
   deletePerson,
   generateInviteCode,
   getSuccessorCandidates,
-  createMarriageProposal,
 } from '../../api/graphService'
 import styles from './GraphCanvas.module.css'
 
 // Stable identity — React Flow warns if nodeTypes is rebuilt each render.
-const nodeTypes = { person: PersonNode }
-
-const RELATION_TITLES = {
-  parent: 'Добавить родителя',
-  child: 'Добавить ребёнка',
-  spouse: 'Добавить супруга(у)',
-}
+const nodeTypes = { person: PersonNode, union: UnionNode }
 
 /* ------------------------------------------------- SVG export (raster) --- */
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-// Rebuilds the current layout as a self-contained SVG string for rasterising.
-function buildSvg(nodes, edges) {
-  if (!nodes.length) return '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"></svg>'
+/**
+ * Rebuilds the current layout as a self-contained SVG string for rasterising.
+ * PNG exports transparent and without a heading; JPEG paints a white background
+ * and adds the "Родовое древо" title.
+ */
+function buildSvg(nodes, edges, format) {
+  const personNodes = nodes.filter((n) => n.data?.person)
+  if (!personNodes.length) return '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"></svg>'
+  const bare = format === 'png'
   const pad = 60
-  const xs = nodes.map((n) => n.position.x)
-  const ys = nodes.map((n) => n.position.y)
+  const xs = personNodes.map((n) => n.position.x)
+  const ys = personNodes.map((n) => n.position.y)
   const minX = Math.min(...xs) - pad
   const minY = Math.min(...ys) - pad
   const maxX = Math.max(...xs) + NODE_SIZE.width + pad
   const maxY = Math.max(...ys) + NODE_SIZE.height + pad
   const W = Math.round(maxX - minX)
-  const H = Math.round(maxY - minY)
+  const H = Math.round(maxY - minY) + (bare ? 0 : 30)
+  const shiftY = bare ? 0 : 30
 
-  const center = (n) => ({
-    x: n.position.x - minX + NODE_SIZE.width / 2,
-    y: n.position.y - minY + NODE_SIZE.height / 2,
-  })
+  // Size-aware centre — union nodes are tiny, so edges meet at their true point.
+  const center = (n) => {
+    const size = n.type === 'union' ? UNION_SIZE : NODE_SIZE
+    return {
+      x: n.position.x - minX + size.width / 2,
+      y: n.position.y - minY + size.height / 2 + shiftY,
+    }
+  }
   const byId = new Map(nodes.map((n) => [n.id, n]))
 
   const edgeSvg = edges
@@ -68,35 +75,153 @@ function buildSvg(nodes, edges) {
     })
     .join('')
 
-  const nodeSvg = nodes
+  const nodeSvg = personNodes
     .map((n) => {
-      const p = n.person ?? n.data.person
+      const p = n.data.person
       const x = n.position.x - minX
-      const y = n.position.y - minY
+      const y = n.position.y - minY + shiftY
+      const cx = x + NODE_SIZE.width / 2
       const isFocus = n.data.isFocus
       const deceased = !p.is_alive
       const nameFill = deceased ? '#8a8a8a' : '#1a1a1a'
-      const initial = esc((p.full_name || '?').trim()[0] || '?')
+      const displayName = formatPersonName(p)
+      const initial = esc((displayName || '?').trim()[0] || '?')
       return `
         <g>
-          <rect x="${x}" y="${y}" width="${NODE_SIZE.width}" height="${NODE_SIZE.height}" rx="14"
+          <rect x="${x}" y="${y}" width="${NODE_SIZE.width}" height="${NODE_SIZE.height}" rx="16"
             fill="#ffffff" stroke="${isFocus ? '#ff7648' : 'rgba(26,26,26,0.12)'}" stroke-width="${isFocus ? 2.5 : 1}"/>
-          <circle cx="${x + 34}" cy="${y + NODE_SIZE.height / 2}" r="22" fill="#f0f0f1"/>
-          <text x="${x + 34}" y="${y + NODE_SIZE.height / 2 + 6}" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="600" fill="#8a8a8a">${initial}</text>
-          <text x="${x + 66}" y="${y + NODE_SIZE.height / 2 + 5}" font-family="sans-serif" font-size="15" font-weight="600" fill="${nameFill}">${esc(p.full_name)}</text>
+          <circle cx="${cx}" cy="${y + 40}" r="26" fill="#f0f0f1"/>
+          <text x="${cx}" y="${y + 47}" text-anchor="middle" font-family="sans-serif" font-size="20" font-weight="600" fill="#8a8a8a">${initial}</text>
+          <text x="${cx}" y="${y + NODE_SIZE.height - 22}" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="600" fill="${nameFill}">${esc(displayName)}</text>
         </g>`
     })
     .join('')
 
+  const background = bare ? '' : `<rect width="${W}" height="${H}" fill="#ffffff"/>`
+  const heading = bare
+    ? ''
+    : `<text x="${pad}" y="${pad}" font-family="sans-serif" font-size="20" font-weight="700" fill="#1a1a1a">Родовое древо</text>`
+
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-    <rect width="${W}" height="${H}" fill="#fafafa"/>
+    ${background}
+    ${heading}
     <g>${edgeSvg}${nodeSvg}</g>
   </svg>`
 }
 
+/* ==================================================== controls cluster === */
+/** Fullscreen toggle glyph (kept local to keep the shared icon set lean). */
+function FullscreenIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/**
+ * Bottom-left controls: zoom in, zoom out, fullscreen, export — in that order.
+ * The zoom percentage flashes briefly whenever the zoom changes.
+ */
+function GraphControls({ canvasRef, onExport, exporting }) {
+  const { zoomIn, zoomOut } = useReactFlow()
+  const { zoom } = useViewport()
+
+  const [badgeVisible, setBadgeVisible] = useState(false)
+  const firstZoom = useRef(true)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+
+  // Reveal the zoom readout only while the zoom is actually changing.
+  useEffect(() => {
+    if (firstZoom.current) {
+      firstZoom.current = false
+      return
+    }
+    setBadgeVisible(true)
+    const timer = setTimeout(() => setBadgeVisible(false), 1200)
+    return () => clearTimeout(timer)
+  }, [zoom])
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  useEffect(() => {
+    if (!exportOpen) return
+    const close = () => setExportOpen(false)
+    window.addEventListener('pointerdown', close)
+    return () => window.removeEventListener('pointerdown', close)
+  }, [exportOpen])
+
+  const toggleFullscreen = () => {
+    const el = canvasRef.current
+    if (!el) return
+    if (document.fullscreenElement) document.exitFullscreen()
+    else el.requestFullscreen?.()
+  }
+
+  const runExport = (fmt) => {
+    setExportOpen(false)
+    onExport(fmt)
+  }
+
+  return (
+    <>
+      <Panel position="bottom-left" className={styles.controls}>
+        <button type="button" className={styles.control} onClick={() => zoomIn()} aria-label="Приблизить">
+          <PlusIcon />
+        </button>
+        <button type="button" className={styles.control} onClick={() => zoomOut()} aria-label="Отдалить">
+          <MinusIcon />
+        </button>
+        <button
+          type="button"
+          className={styles.control}
+          onClick={toggleFullscreen}
+          aria-label={fullscreen ? 'Выйти из полноэкранного режима' : 'Во весь экран'}
+        >
+          <FullscreenIcon />
+        </button>
+        <div className={styles.exportWrap} onPointerDown={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className={styles.control}
+            onClick={() => setExportOpen((v) => !v)}
+            disabled={exporting}
+            aria-label="Экспорт древа"
+            aria-expanded={exportOpen}
+          >
+            <DownloadIcon />
+          </button>
+          {exportOpen && (
+            <div className={styles.exportMenu} role="menu">
+              <span className={styles.exportHint}>Скачать как</span>
+              <button type="button" role="menuitem" onClick={() => runExport('png')}>PNG</button>
+              <button type="button" role="menuitem" onClick={() => runExport('jpeg')}>JPEG</button>
+            </div>
+          )}
+        </div>
+      </Panel>
+
+      <Panel
+        position="top-center"
+        className={`${styles.zoomBadge} ${badgeVisible ? styles.zoomBadgeVisible : ''}`}
+      >
+        {Math.round(zoom * 100)}%
+      </Panel>
+    </>
+  )
+}
+
 /* ======================================================== component ===== */
-export default function GraphCanvas({ focusPerson, onGraphChanged }) {
+function GraphCanvasInner({ focusPerson, onGraphChanged }) {
   const focusId = focusPerson.id
+  const navigate = useNavigate()
+  const { setCenter } = useReactFlow()
+  const canvasRef = useRef(null)
 
   const [graph, setGraph] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -159,17 +284,50 @@ export default function GraphCanvas({ focusPerson, onGraphChanged }) {
     [graph],
   )
 
+  // Open the tree at 100% zoom centred on the current user. Runs once per graph
+  // (re)load — keyed on the graph object, so selecting a card doesn't recentre.
+  const centeredRef = useRef(null)
+  useEffect(() => {
+    if (!graph || centeredRef.current === graph || !nodes.length) return
+    const focusNode = nodes.find((n) => n.data?.isFocus)
+    if (!focusNode) return
+    centeredRef.current = graph
+    setCenter(
+      focusNode.position.x + NODE_SIZE.width / 2,
+      focusNode.position.y + NODE_SIZE.height / 2,
+      { zoom: 1, duration: 300 },
+    )
+  }, [graph, nodes, setCenter])
+
   /* -------------------------------------------------------- selection --- */
+  // Left-click: clicking your own node jumps to the profile page; clicking
+  // anyone else opens their full-profile modal over the card. Union junctions
+  // aren't people — ignore them.
   const handleNodeClick = useCallback((_, node) => {
+    if (node.type === 'union') return
+    if (node.id === focusId) {
+      navigate(ROUTES.profile)
+      return
+    }
     setSelectedId(node.id)
     setDetail(null)
     loadDetail(node.id)
-  }, [loadDetail])
+    setModal({ kind: 'profile' })
+  }, [loadDetail, focusId, navigate])
+
+  // Right-click suppresses the browser menu and opens the add-relative modal.
+  const handleNodeContextMenu = useCallback((event, node) => {
+    event.preventDefault()
+    if (node.type === 'union') return
+    setModal({ kind: 'add', targetId: node.id, targetPerson: node.data.person })
+  }, [])
 
   const clearSelection = useCallback(() => {
     setSelectedId(null)
     setDetail(null)
   }, [])
+
+  const closeModal = useCallback(() => setModal(null), [])
 
   /* ------------------------------------------------------- mutations --- */
   const afterMutation = useCallback(async (message) => {
@@ -179,19 +337,85 @@ export default function GraphCanvas({ focusPerson, onGraphChanged }) {
     if (selectedId) loadDetail(selectedId)
   }, [flash, loadGraph, selectedId, loadDetail])
 
-  const handleAddRelative = (type) =>
-    setModal({ kind: 'add', relationType: type, targetId: selectedId })
+  // Kinship read straight from the loaded edges (child_of: from = child → to = parent).
+  const parentIdsOf = useCallback(
+    (personId) =>
+      (graph?.relationships ?? [])
+        .filter((r) => r.type === 'child_of' && r.from_person_id === personId)
+        .map((r) => r.to_person_id),
+    [graph],
+  )
+  const childIdsOf = useCallback(
+    (personId) =>
+      (graph?.relationships ?? [])
+        .filter((r) => r.type === 'child_of' && r.to_person_id === personId)
+        .map((r) => r.from_person_id),
+    [graph],
+  )
+  const siblingIdsOf = useCallback(
+    (personId) => {
+      const ids = new Set()
+      for (const parentId of parentIdsOf(personId)) {
+        for (const childId of childIdsOf(parentId)) if (childId !== personId) ids.add(childId)
+      }
+      return [...ids]
+    },
+    [parentIdsOf, childIdsOf],
+  )
 
-  const submitAdd = async (values) => {
-    await createPerson({
-      ...values,
-      relation: { to_person_id: modal.targetId, type: modal.relationType },
-    })
-    await afterMutation(
-      modal.relationType === 'spouse'
-        ? 'Готово. Если супруг(а) из другой семьи — отправлен запрос на связь.'
-        : 'Родственник добавлен',
-    )
+  // The backend only knows parent/child/spouse, so wider roles attach the new
+  // person to an intermediate relative (a parent, grandparent, child or sibling
+  // of the clicked node). `anchor` says which relative to attach to; `relation`
+  // and `gender` are then read relative to that anchor.
+  const ROLE_MAP = {
+    father: { gender: 'male', anchor: 'self', relation: 'parent' },
+    mother: { gender: 'female', anchor: 'self', relation: 'parent' },
+    grandfather: { gender: 'male', anchor: 'parent', relation: 'parent' },
+    grandmother: { gender: 'female', anchor: 'parent', relation: 'parent' },
+    brother: { gender: 'male', anchor: 'parent', relation: 'child' },
+    sister: { gender: 'female', anchor: 'parent', relation: 'child' },
+    uncle: { gender: 'male', anchor: 'grandparent', relation: 'child' },
+    aunt: { gender: 'female', anchor: 'grandparent', relation: 'child' },
+    spouse: { gender: null, anchor: 'self', relation: 'spouse' },
+    son: { gender: 'male', anchor: 'self', relation: 'child' },
+    daughter: { gender: 'female', anchor: 'self', relation: 'child' },
+    grandson: { gender: 'male', anchor: 'child', relation: 'child' },
+    granddaughter: { gender: 'female', anchor: 'child', relation: 'child' },
+    nephew: { gender: 'male', anchor: 'sibling', relation: 'child' },
+    niece: { gender: 'female', anchor: 'sibling', relation: 'child' },
+  }
+  const ANCHOR_ERROR = {
+    parent: 'Сначала добавьте родителя — эта роль привязывается к нему',
+    grandparent: 'Сначала добавьте дедушку или бабушку — эта роль привязывается к ним',
+    child: 'Сначала добавьте ребёнка — эта роль привязывается к нему',
+    sibling: 'Сначала добавьте брата или сестру — эта роль привязывается к ним',
+  }
+
+  const submitAdd = async ({ role, values }) => {
+    const cfg = ROLE_MAP[role]
+    if (!cfg) throw new Error('Выберите, кем приходится новый родственник')
+
+    const targetId = modal.targetId
+    const targetGender = modal.targetPerson?.gender
+
+    const anchorIds = {
+      self: [targetId],
+      parent: parentIdsOf(targetId),
+      grandparent: parentIdsOf(targetId).flatMap(parentIdsOf),
+      child: childIdsOf(targetId),
+      sibling: siblingIdsOf(targetId),
+    }[cfg.anchor]
+
+    if (!anchorIds?.length) throw new Error(ANCHOR_ERROR[cfg.anchor] ?? 'Не удалось определить связь')
+
+    const gender =
+      cfg.relation === 'spouse' && cfg.gender == null
+        ? targetGender === 'male' ? 'female' : 'male'
+        : cfg.gender
+    const relation = { to_person_id: anchorIds[0], type: cfg.relation }
+
+    await createPerson({ ...values, gender, relation })
+    await afterMutation('Родственник добавлен')
   }
 
   const submitEdit = async (values) => {
@@ -238,22 +462,16 @@ export default function GraphCanvas({ focusPerson, onGraphChanged }) {
     }
   }
 
-  const submitMerge = async (code) => {
-    await createMarriageProposal({ person_a_id: focusId, target_invite_code: code })
-    setModal(null)
-    flash('Запрос на связь семей отправлен. Ожидайте подтверждения.')
-  }
-
   /* ---------------------------------------------------------- export --- */
   const [exporting, setExporting] = useState(false)
-  const handleExport = async () => {
+  const handleExport = useCallback(async (format) => {
     setExporting(true)
     try {
-      await downloadSvgAsImage(buildSvg(nodes, edges), { format: 'png', fileName: 'family-tree' })
+      await downloadSvgAsImage(buildSvg(nodes, edges, format), { format, fileName: 'family-tree' })
     } finally {
       setExporting(false)
     }
-  }
+  }, [nodes, edges])
 
   useEffect(() => () => toastTimer.current && clearTimeout(toastTimer.current), [])
 
@@ -273,27 +491,29 @@ export default function GraphCanvas({ focusPerson, onGraphChanged }) {
   }
 
   return (
-    <div className={styles.canvas}>
+    <div className={styles.canvas} ref={canvasRef}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         onNodeClick={handleNodeClick}
+        onNodeContextMenu={handleNodeContextMenu}
         onPaneClick={clearSelection}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable
         onlyRenderVisibleElements
-        fitView
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         minZoom={0.2}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
         <Background gap={28} color="#e7e7e9" />
-        <Controls showInteractive={false} />
 
-        <Panel position="top-left" className={styles.toolbar}>
-          {hasMore && (
+        <GraphControls canvasRef={canvasRef} onExport={handleExport} exporting={exporting} />
+
+        {hasMore && (
+          <Panel position="top-left" className={styles.toolbar}>
             <button
               type="button"
               className={styles.toolbarBtn}
@@ -301,14 +521,8 @@ export default function GraphCanvas({ focusPerson, onGraphChanged }) {
             >
               <UsersIcon /> Показать ещё поколение
             </button>
-          )}
-          <button type="button" className={styles.toolbarBtn} onClick={() => setModal({ kind: 'merge' })}>
-            <UsersIcon /> Связать с другой семьёй
-          </button>
-          <button type="button" className={styles.toolbarBtn} onClick={handleExport} disabled={exporting}>
-            <DownloadIcon /> {exporting ? 'Экспорт…' : 'Скачать PNG'}
-          </button>
-        </Panel>
+          </Panel>
+        )}
 
         <Panel position="bottom-right" className={styles.legend}>
           <span className={styles.legendItem}><span className={`${styles.dot} ${styles.status_registered}`} /> В приложении</span>
@@ -317,27 +531,25 @@ export default function GraphCanvas({ focusPerson, onGraphChanged }) {
         </Panel>
       </ReactFlow>
 
-      {selectedId && (
-        <NodeDetailPanel
+      {/* --------------------------------------------------------- modals */}
+      {/* Left-click: full profile over the card. */}
+      {modal?.kind === 'profile' && (
+        <PersonProfileModal
           detail={detail}
           loading={detailLoading}
-          callbacks={{
-            onAddRelative: handleAddRelative,
-            onEdit: () => setModal({ kind: 'edit' }),
-            onRemove: handleRemove,
-            onInvite: handleInvite,
-            onClose: clearSelection,
-          }}
+          onClose={() => { closeModal(); clearSelection() }}
+          onEdit={() => setModal({ kind: 'edit' })}
+          onRemove={handleRemove}
+          onInvite={handleInvite}
         />
       )}
 
-      {/* --------------------------------------------------------- modals */}
+      {/* Right-click: add a new family member with a role selector. */}
       {modal?.kind === 'add' && (
-        <PersonFormModal
-          title={RELATION_TITLES[modal.relationType]}
-          submitLabel="Добавить"
+        <AddMemberModal
+          targetName={formatPersonName(modal.targetPerson, 'родственнику')}
           onSubmit={submitAdd}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
         />
       )}
 
@@ -347,15 +559,15 @@ export default function GraphCanvas({ focusPerson, onGraphChanged }) {
           submitLabel="Сохранить"
           initial={detail}
           onSubmit={submitEdit}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
         />
       )}
 
       {modal?.kind === 'confirmRemove' && (
         <ConfirmRemoveModal
-          name={detail?.full_name}
+          name={formatPersonName(detail)}
           onConfirm={() => runRemove()}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
         />
       )}
 
@@ -371,12 +583,18 @@ export default function GraphCanvas({ focusPerson, onGraphChanged }) {
         <InviteCodeModal code={modal.code} onClose={() => setModal(null)} onCopied={() => flash('Код скопирован')} />
       )}
 
-      {modal?.kind === 'merge' && (
-        <MergeModal onSubmit={submitMerge} onClose={() => setModal(null)} />
-      )}
-
       {toast && <div className={styles.toast} role="status">{toast}</div>}
     </div>
+  )
+}
+
+/** Public component — wraps the graph in its own React Flow provider so the
+ *  controls can read/drive the viewport zoom. */
+export default function GraphCanvas(props) {
+  return (
+    <ReactFlowProvider>
+      <GraphCanvasInner {...props} />
+    </ReactFlowProvider>
   )
 }
 
@@ -424,7 +642,7 @@ function SuccessorModal({ candidates, onPick, onClose }) {
             <label className={styles.pickerItem}>
               <input type="radio" name="successor" checked={picked === c.id} onChange={() => setPicked(c.id)} />
               {c.avatar_url && <img src={c.avatar_url} alt="" className={styles.pickerAvatar} />}
-              <span>{c.full_name}</span>
+              <span>{formatPersonName(c, 'Без имени')}</span>
             </label>
           </li>
         ))}
@@ -455,52 +673,6 @@ function InviteCodeModal({ code, onClose, onCopied }) {
       <div className={styles.modalActions}>
         <Button variant="accent" size="sm" trailingIcon={<CheckIcon />} onClick={copy}>Скопировать</Button>
       </div>
-    </ModalShell>
-  )
-}
-
-function MergeModal({ onSubmit, onClose }) {
-  const [code, setCode] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const valid = isValidFamilyCode(code)
-
-  const submit = async (e) => {
-    e.preventDefault()
-    if (!valid || submitting) return
-    setError('')
-    setSubmitting(true)
-    try {
-      await onSubmit(code)
-    } catch (err) {
-      setError(err.message || 'Не удалось отправить запрос')
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <ModalShell title="Связать с другой семьёй" onClose={onClose}>
-      <form className={styles.modalForm} onSubmit={submit} noValidate>
-        <p className={styles.modalText}>
-          Введите код приглашения узла другой семьи. После подтверждения их администратором деревья станут видны друг другу.
-        </p>
-        <input
-          className={styles.formInput}
-          value={code}
-          onChange={(e) => setCode(normalizeInviteCode(e.target.value))}
-          placeholder="8-значный код"
-          autoCapitalize="characters"
-          autoComplete="off"
-          autoFocus
-        />
-        {error && <p className={styles.formError} role="alert">{error}</p>}
-        <div className={styles.modalActions}>
-          <Button type="button" variant="primary" size="sm" onClick={onClose}>Отмена</Button>
-          <Button type="submit" variant="accent" size="sm" disabled={!valid || submitting}>
-            {submitting ? 'Отправка…' : 'Отправить запрос'}
-          </Button>
-        </div>
-      </form>
     </ModalShell>
   )
 }

@@ -19,6 +19,7 @@ import { getMyProfile, updateProfile } from '../../api/profileService'
 import { useAuth } from '../../auth/AuthContext'
 import { ROUTES } from '../../Routes/Routes'
 import { formatDate, displayValue } from '../../utils/format'
+import { formatPersonName } from '../../utils/fullName'
 import styles from './Profile.module.css'
 
 const GENDER_LABELS = { male: 'Мужской', female: 'Женский' }
@@ -105,7 +106,7 @@ export default function Profile() {
                 <img className={styles.avatar} src={user.avatar_url} alt="Аватар пользователя" />
               </div>
 
-              <h1 className={styles.name}>{user.full_name}</h1>
+              <h1 className={styles.name}>{formatPersonName(user, '—')}</h1>
 
               <div className={styles.identityActions}>
                 <Button variant="primary" size="sm" trailingIcon={<EditIcon />} onClick={() => setEditing(true)}>

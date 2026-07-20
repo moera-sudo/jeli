@@ -68,13 +68,18 @@
   font-size: 0.9rem;
   font-weight: var(--font-weight-medium);
   color: var(--color-muted);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
+  transition: background 0.15s ease, color 0.15s ease;
   cursor: pointer;
 }
 
-.tab:hover { background: #f4f4f5; }
+/* Idle-tab hover only — the active tab keeps its dark fill so its light text
+   never blends into a light hover background. */
+.tab:not(.tabActive):hover { background: #f4f4f5; color: var(--color-ink); }
 
 .tabActive { color: var(--color-base); background: var(--color-ink); }
+
+.tabActive:hover { color: var(--color-base); background: var(--color-ink); opacity: 0.9; }
 
 .count {
   display: inline-flex;

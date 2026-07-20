@@ -2,11 +2,28 @@
  * Full-name handling for the CIS convention "Фамилия Имя Отчество"
  * (surname · first name · middle name).
  *
- * The backend stores a single `full_name` string, so the three parts are
- * joined with spaces on save and split back on load. Splitting keeps the first
- * two tokens as surname and first name; any remaining tokens become the middle
- * name — reversible for standard two/three-part names.
+ * The backend stores the name as three separate columns
+ * (`last_name` · `first_name` · `patronymic`). `formatPersonName` joins them
+ * for display; `splitFullName`/`joinFullName` remain for the local editor state
+ * (which keeps the parts under surname/firstName/middleName keys).
  */
+
+/**
+ * Joins a person's stored name parts into a single display string.
+ * Accepts any object exposing `last_name` / `first_name` / `patronymic`
+ * (UserMe, PersonNode, PersonDetail, SuccessorCandidate…).
+ *
+ * @param {{ last_name?: string, first_name?: string, patronymic?: string }|null|undefined} person
+ * @param {string} [fallback]
+ * @returns {string} "Фамилия Имя Отчество" with empty parts dropped.
+ */
+export function formatPersonName(person, fallback = '') {
+  const name = [person?.last_name, person?.first_name, person?.patronymic]
+    .map((part) => String(part ?? '').trim())
+    .filter(Boolean)
+    .join(' ')
+  return name || fallback
+}
 
 /**
  * @param {string|null|undefined} fullName
