@@ -25,9 +25,13 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-jeli}:${POSTGRES_PASSWORD:-jeli}@db:5432/${POSTGRES_DB:-jeli}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      # * Загруженные файлы (media) — переживают пересборку контейнера
+      - jeli_uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   jeli_db_data:
+  jeli_uploads_data:

@@ -1,0 +1,43 @@
+info:
+  name: Create
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/users/create"
+  body:
+    type: json
+    data: |-
+      {
+        "current_city": "Astana",
+        "current_country": "KZ",
+        "birth_city": "Astana",
+        "nationality": "Kazakh"
+      }
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: >-
+    POST /users/create — альтернатива register/with-info: дозаполняет профильные поля уже
+    зарегистрированного пользователя (без ФИО). Безопасно для основного трека — не трогает
+    last_name/first_name/patronymic, которые проверяют другие запросы этой папки.
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("fills additional profile fields", function () {
+          expect(res.body.current_city).to.equal("Astana");
+          expect(res.body.nationality).to.equal("Kazakh");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

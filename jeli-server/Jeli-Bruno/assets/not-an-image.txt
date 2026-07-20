@@ -1,0 +1,1 @@
+This is a plain text file used to verify that POST /media rejects unsupported content types.

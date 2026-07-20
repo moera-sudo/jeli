@@ -1,0 +1,29 @@
+info:
+  name: 26 Login As Deleted User5 Fails
+  type: http
+  seq: 26
+
+http:
+  method: POST
+  url: "{{base_url}}/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "scenario.user5@example.com",
+        "password": "string123"
+      }
+  auth: inherit
+  docs: "Подтверждает, что удаление аккаунта необратимо и по-настоящему удаляет запись логина (не soft-delete)."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "401"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

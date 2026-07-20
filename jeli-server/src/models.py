@@ -13,6 +13,6 @@ from src.features.graph.models import (  # noqa: F401
     RelationshipProposal,
 )
 from src.features.notifications.models import Notification  # noqa: F401
-
-# TODO: раскомментировать по мере реализации мессенджера
-# from src.features.messenger.models import Conversation, Message  # noqa: F401
+from src.features.media.models import Media  # noqa: F401
+from src.features.messenger.models import Chat, Message  # noqa: F401
+from src.features.family.models import Family  # noqa: F401

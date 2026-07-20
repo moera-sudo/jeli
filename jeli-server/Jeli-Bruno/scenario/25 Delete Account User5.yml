@@ -1,0 +1,26 @@
+info:
+  name: 25 Delete Account User5
+  type: http
+  seq: 25
+
+http:
+  method: DELETE
+  url: "{{base_url}}/users/delete"
+  auth:
+    type: bearer
+    token: "{{access_token_5}}"
+  docs: >-
+    Единственный владелец без других участников графа — граф каскадно удаляется вместе с аккаунтом,
+    new_owner_user_id не требуется (см. graph_service.handle_account_deletion).
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "204"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

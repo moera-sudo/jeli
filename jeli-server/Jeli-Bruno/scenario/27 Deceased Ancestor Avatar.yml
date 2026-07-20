@@ -1,0 +1,52 @@
+info:
+  name: 27 Deceased Ancestor Avatar
+  type: http
+  seq: 27
+
+http:
+  method: POST
+  url: "{{base_url}}/persons"
+  body:
+    type: json
+    data: |-
+      {
+        "last_name": "Сейітов",
+        "first_name": "Дед",
+        "patronymic": null,
+        "gender": "male",
+        "is_alive": false,
+        "birth_year_value": 1910,
+        "birth_year_precision": "decade",
+        "death_year_value": 1985,
+        "death_year_precision": "decade",
+        "source_type": "oral_tradition",
+        "has_attached_file": false
+      }
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: >-
+    Умерший предок (is_alive=false) — по ТЗ ему тоже можно поставить аватарку, если она есть в
+    семейном архиве (is_alive никак не участвует в can_edit_person). Без relation (бесхозный узел
+    под user1) — намеренно: person_id/shared_ancestor_a уже израсходовали оба parent-слота
+    (MAX_PARENTS_PER_PERSON=2) в scenario/6-9 и persons/Create.yml, а цель этого шага — только
+    проверить is_alive=false + аватарку, не позицию в графе. Захватывает deceased_person_id,
+    аватарка ставится следующим запросом.
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("deceased_person_id", res.body.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

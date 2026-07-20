@@ -1,0 +1,36 @@
+info:
+  name: Create Chat Is Idempotent
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/chats"
+  body:
+    type: json
+    data: |-
+      {
+        "person_id": "{{person_id_2}}"
+      }
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: "Повторный вызов с тем же person_id не создаёт дубликат — возвращает тот же chat_id, что и первый POST /chats."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("returns the same chat, not a duplicate", function () {
+          expect(res.body.id).to.equal(bru.getVar("chat_id"));
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,43 @@
+info:
+  name: Upsert
+  type: http
+  seq: 2
+
+http:
+  method: PUT
+  url: "{{base_url}}/family"
+  body:
+    type: json
+    data: |-
+      {
+        "title": "История рода Сейітовых",
+        "content": "# Начало\nНаша семья ведёт начало с деда ![фото]({{media_url}})\n\n## Ветви\nЕщё немного текста истории."
+      }
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: >-
+    На граф — один markdown + один заголовок. content хранится как есть, ссылка {{media_url}}
+    (из media/Upload.yml) подставлена клиентом так же, как это сделал бы markdown-редактор фронтенда
+    после загрузки фото через POST /media.
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("creates or overwrites the single family record", function () {
+          expect(res.body.id).to.be.a("string");
+          expect(res.body.owner_user_id).to.equal(bru.getVar("user_id"));
+          expect(res.body.title).to.equal("История рода Сейітовых");
+          expect(res.body.content).to.include(bru.getVar("media_url"));
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,23 @@
+info:
+  name: Read All
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/notifications/read-all"
+  auth:
+    type: bearer
+    token: "{{access_token_2}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "204"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

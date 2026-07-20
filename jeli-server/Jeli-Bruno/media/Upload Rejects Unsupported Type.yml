@@ -1,0 +1,38 @@
+info:
+  name: Upload Rejects Unsupported Type
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/media"
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - assets/not-an-image.txt
+        contentType: text/plain
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: "Проверяет ALLOWED_IMAGE_CONTENT_TYPES — .txt должен быть отклонён с 400."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+  scripts:
+    - type: tests
+      code: |
+        test("rejects unsupported content type", function () {
+          expect(res.body.detail).to.equal("Unsupported file type");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

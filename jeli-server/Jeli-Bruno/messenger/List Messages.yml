@@ -1,0 +1,32 @@
+info:
+  name: List Messages
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/chats/{{chat_id}}/messages"
+  auth:
+    type: bearer
+    token: "{{access_token_2}}"
+  docs: "Читает историю от лица user2 (второго участника чата) — доступ по участию в чате, не только владельцу."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("user2 sees the message sent by user1", function () {
+          const msg = res.body.find((m) => m.id === bru.getVar("message_id"));
+          expect(msg).to.not.equal(undefined);
+          expect(msg.sender_id).to.equal(bru.getVar("user_id"));
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
