@@ -1,11 +1,11 @@
 info:
-  name: Profile ID
+  name: Search No Match
   type: http
   seq: 2
 
 http:
   method: GET
-  url: "{{base_url}}/users/profile/{{user_id}}"
+  url: "{{base_url}}/search?q=zzz-no-such-substring-zzz"
   auth:
     type: bearer
     token: "{{access_token}}"
@@ -18,9 +18,8 @@ runtime:
   scripts:
     - type: tests
       code: |
-        test("returns the public profile", function () {
-          expect(res.body.id).to.equal(bru.getVar("user_id"));
-          expect(res.body.person_id).to.equal(bru.getVar("person_id"));
+        test("returns an empty list, not an error", function () {
+          expect(res.body).to.deep.equal([]);
         });
 
 settings:
