@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # * Логирование
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
+    # * Файлы (media) — папка на диске, смонтированная volume'ом в docker-compose.yml
+    upload_dir: str = Field(default="uploads", alias="UPLOAD_DIR")
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def split_cors_origins(cls, value: str | list[str]) -> list[str]:

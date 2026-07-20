@@ -59,3 +59,30 @@ variables:
   - name: invite_code_4
     description: "Инвайт-код узла user4 — таргет для marriage-proposals/Create.yml (scenario/16)."
     value: ""
+  - name: media_id
+    description: "ID загруженного файла из media/Upload.yml — используется для GET /media/{id} и в family/Upsert.yml."
+    value: ""
+  - name: media_url
+    description: "Полный url (/api/media/{id}) из media/Upload.yml."
+    value: ""
+  - name: chat_id
+    description: "Чат между user1 и user2 (person_id_2) — создаётся идемпотентно в messenger/Create Chat.yml."
+    value: ""
+  - name: message_id
+    value: ""
+  - name: notification_id
+    description: "Первое непрочитанное уведомление user2 (new_message) — заполняется notifications/List.yml."
+    value: ""
+  - name: access_token_with_info
+    description: "Отдельный аккаунт для auth/Register With Info.yml — не пересекается с access_token основного трека."
+    value: ""
+  - name: user_id_with_info
+    value: ""
+  - name: access_token_5
+    description: "Одноразовый аккаунт scenario/22-23 — регистрируется и тут же удаляется, проверяет DELETE /users/delete."
+    value: ""
+  - name: user_id_5
+    value: ""
+  - name: deceased_person_id
+    description: "Умерший предок из scenario/27 — проверяет, что аватарку можно поставить и is_alive=false узлу."
+    value: ""

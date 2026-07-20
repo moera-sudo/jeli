@@ -1,0 +1,63 @@
+info:
+  name: Register With Info
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/auth/register/with-info"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "with.info@example.com",
+        "password": "string123",
+        "last_name": "Zhaksybekov",
+        "first_name": "Nurlan",
+        "patronymic": null,
+        "graph_invite_code": "",
+        "gender": "male",
+        "current_city": "Almaty",
+        "current_country": "KZ",
+        "birth_date": "1990-05-12",
+        "birth_city": "Shymkent",
+        "birth_country": "KZ",
+        "description": "Заполнено сразу при регистрации через with-info",
+        "nationality": "Kazakh",
+        "ru": "",
+        "zhuz": "",
+        "tribe": "",
+        "avatar_url": null
+      }
+  auth: inherit
+  docs: >-
+    POST /auth/register/with-info — полная форма регистрации (все профильные поля за один запрос).
+    Захватывает СВОИ отдельные access_token_with_info/user_id_with_info, чтобы не затереть
+    access_token/user_id основного трека (auth/Register.yml), от которых зависят все остальные папки.
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("returns tokens and full profile", function () {
+          expect(res.body.access_token).to.be.a("string");
+          expect(res.body.user.gender).to.equal("male");
+          expect(res.body.user.current_city).to.equal("Almaty");
+          expect(res.body.user.nationality).to.equal("Kazakh");
+        });
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("access_token_with_info", res.body.access_token);
+          bru.setVar("user_id_with_info", res.body.user.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

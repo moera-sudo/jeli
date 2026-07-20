@@ -1,0 +1,38 @@
+info:
+  name: Set User Avatar
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/users/profile/avatar"
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - assets/test-avatar.png
+        contentType: image/png
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: "Загружает файл и сразу проставляет avatar_url текущего пользователя (user1) — один вызов вместо upload+PATCH."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("avatar_url points to /api/media/{id}, not raw bytes", function () {
+          expect(res.body.avatar_url).to.match(/^\/api\/media\/[0-9a-f-]{36}$/);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

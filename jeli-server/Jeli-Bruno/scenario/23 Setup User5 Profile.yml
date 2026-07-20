@@ -1,0 +1,30 @@
+info:
+  name: 23 Setup User5 Profile
+  type: http
+  seq: 23
+
+http:
+  method: PATCH
+  url: "{{base_url}}/users/profile/edit"
+  body:
+    type: json
+    data: |-
+      {
+        "gender": "male"
+      }
+  auth:
+    type: bearer
+    token: "{{access_token_5}}"
+  docs: "gender обязателен для POST /graph/create."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

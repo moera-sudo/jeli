@@ -1,0 +1,29 @@
+info:
+  name: Mark Read
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/notifications/{{notification_id}}/read"
+  auth:
+    type: bearer
+    token: "{{access_token_2}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("marks the notification as read", function () {
+          expect(res.body.is_read).to.equal(true);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

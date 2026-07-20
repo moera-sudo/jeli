@@ -1,0 +1,24 @@
+info:
+  name: 24 Create Graph User5
+  type: http
+  seq: 24
+
+http:
+  method: POST
+  url: "{{base_url}}/graph/create"
+  auth:
+    type: bearer
+    token: "{{access_token_5}}"
+  docs: "user5 становится единоличным владельцем своего графа — нужен, чтобы DELETE /users/delete ниже прошёл через ветку каскадного удаления графа (нет других участников, некому передать владение)."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

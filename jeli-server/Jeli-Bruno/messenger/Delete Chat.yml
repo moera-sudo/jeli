@@ -1,0 +1,24 @@
+info:
+  name: Delete Chat
+  type: http
+  seq: 6
+
+http:
+  method: DELETE
+  url: "{{base_url}}/chats/{{chat_id}}"
+  auth:
+    type: bearer
+    token: "{{access_token_2}}"
+  docs: "Удаляет чат от лица user2 — доступно любому из двух участников, не только создателю (user1)."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "204"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

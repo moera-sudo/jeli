@@ -4,7 +4,10 @@ import logging
 from fastapi import APIRouter
 
 from src.features.auth.router import router as AuthRouter
+from src.features.family.router import router as FamilyRouter
 from src.features.graph.router import router as GraphRouter
+from src.features.media.router import router as MediaRouter
+from src.features.messenger.router import router as MessengerRouter
 from src.features.notifications.router import router as NotificationsRouter
 from src.features.user.router import router as UserRouter
 
@@ -24,7 +27,6 @@ router.include_router(AuthRouter)
 router.include_router(UserRouter)
 router.include_router(GraphRouter)
 router.include_router(NotificationsRouter)
-
-# TODO: подключить по мере реализации мессенджера
-# from src.features.messenger.router import router as MessengerRouter
-# router.include_router(MessengerRouter)
+router.include_router(MediaRouter)
+router.include_router(MessengerRouter)
+router.include_router(FamilyRouter)

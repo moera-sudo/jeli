@@ -30,11 +30,21 @@ from src.features.graph.schemas import (
     SuccessorCandidate,
 )
 from src.features.matching import service as matching_service
+from src.features.messenger import service as messenger_service
 from src.features.user.models import User
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["graph"])
+
+
+async def _attach_chat_thread_id(db: AsyncSession, detail: PersonDetail, current_user: User) -> PersonDetail:
+    # * Только чтение — если чата ещё нет, chat_thread_id остаётся null (создаётся через POST /chats).
+    if detail.linked_user_id is not None and detail.linked_user_id != current_user.id:
+        detail.chat_thread_id = await messenger_service.get_existing_chat_id(
+            db, current_user.id, detail.linked_user_id
+        )
+    return detail
 
 
 @router.post(
@@ -114,7 +124,8 @@ async def create_person(
     logger.info("Create person request received by user %s", current_user.id)
     person = await graph_service.create_person(db, current_user, payload)
     background_tasks.add_task(matching_service.recompute_for_person_task, person.id)
-    return await graph_service.get_person_detail(db, person.id, current_user)
+    detail = await graph_service.get_person_detail(db, person.id, current_user)
+    return await _attach_chat_thread_id(db, detail, current_user)
 
 
 @router.post(
@@ -136,7 +147,8 @@ async def insert_person_between(
 ) -> PersonDetail:
     person = await graph_service.insert_person_between(db, current_user, payload)
     background_tasks.add_task(matching_service.recompute_for_person_task, person.id)
-    return await graph_service.get_person_detail(db, person.id, current_user)
+    detail = await graph_service.get_person_detail(db, person.id, current_user)
+    return await _attach_chat_thread_id(db, detail, current_user)
 
 
 @router.get(
@@ -150,7 +162,8 @@ async def get_my_person(
     current_user: User = Depends(get_user),
 ) -> PersonDetail:
     person = await graph_service.get_linked_person_or_404(db, current_user.id)
-    return await graph_service.get_person_detail(db, person.id, current_user)
+    detail = await graph_service.get_person_detail(db, person.id, current_user)
+    return await _attach_chat_thread_id(db, detail, current_user)
 
 
 @router.get(
@@ -169,7 +182,8 @@ async def get_person(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),
 ) -> PersonDetail:
-    return await graph_service.get_person_detail(db, id, current_user)
+    detail = await graph_service.get_person_detail(db, id, current_user)
+    return await _attach_chat_thread_id(db, detail, current_user)
 
 
 @router.patch(
@@ -192,7 +206,8 @@ async def update_person(
     data = payload.model_dump(exclude_unset=True)
     await graph_service.update_person(db, person, current_user, data)
     background_tasks.add_task(matching_service.recompute_for_person_task, id)
-    return await graph_service.get_person_detail(db, id, current_user)
+    detail = await graph_service.get_person_detail(db, id, current_user)
+    return await _attach_chat_thread_id(db, detail, current_user)
 
 
 @router.delete(

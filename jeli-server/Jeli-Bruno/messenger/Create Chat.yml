@@ -1,0 +1,46 @@
+info:
+  name: Create Chat
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/chats"
+  body:
+    type: json
+    data: |-
+      {
+        "person_id": "{{person_id_2}}"
+      }
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: >-
+    person_id_2 — реальный узел user2 (linked_user_id = user_id_2), созданный в scenario/5. Чат
+    создаётся между user1 (текущий) и user2. Идемпотентно: повторный прогон коллекции вернёт
+    ТОТ ЖЕ чат (см. тест ниже), т.к. пара (user_a_id, user_b_id) уникальна.
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("creates a chat with user2 as the peer", function () {
+          expect(res.body.id).to.be.a("string");
+          expect(res.body.peer_user_id).to.equal(bru.getVar("user_id_2"));
+          expect(res.body.last_message).to.equal(null);
+        });
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("chat_id", res.body.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

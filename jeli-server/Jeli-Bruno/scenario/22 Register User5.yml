@@ -1,0 +1,40 @@
+info:
+  name: 22 Register User5
+  type: http
+  seq: 22
+
+http:
+  method: POST
+  url: "{{base_url}}/auth/register"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "scenario.user5@example.com",
+        "password": "string123",
+        "last_name": "Nurpeisov",
+        "first_name": "Askar",
+        "patronymic": null,
+        "graph_invite_code": ""
+      }
+  auth: inherit
+  docs: "Пятый, одноразовый аккаунт — единственная цель: пройти полный жизненный цикл до DELETE /users/delete (22-26)."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("access_token_5", res.body.access_token);
+          bru.setVar("user_id_5", res.body.user.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

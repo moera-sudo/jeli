@@ -1,0 +1,49 @@
+info:
+  name: Send Message
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/chats/{{chat_id}}/messages"
+  body:
+    type: json
+    data: |-
+      {
+        "content": "Привет! Кажется, мы с тобой дальние родственники :)"
+      }
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: >-
+    Отправка от user1 в чат с user2. Сервер параллельно: (а) пушит {"type":"message",...} по WS
+    получателю, если он онлайн, и (б) создаёт уведомление new_message (WS {"type":"notification",...}
+    + запись в БД). CLI-раннер Bruno не умеет держать открытый WS-сокет, поэтому живую доставку по WS
+    сюда проверить нельзя — см. notifications/List.yml (проверяет персистентность уведомления со
+    стороны user2, что доказывает срабатывание пайплайна) и Jeli-Bruno/scripts/verify_chat_websocket.py
+    (реальный WS-клиент, вручную подтверждает живой пуш — см. docs в этом скрипте).
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("persists the message", function () {
+          expect(res.body.id).to.be.a("string");
+          expect(res.body.chat_id).to.equal(bru.getVar("chat_id"));
+          expect(res.body.sender_id).to.equal(bru.getVar("user_id"));
+        });
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("message_id", res.body.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

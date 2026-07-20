@@ -1,0 +1,46 @@
+info:
+  name: Upload
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/media"
+  body:
+    type: multipart-form
+    data:
+      - name: file
+        type: file
+        value:
+          - assets/test-avatar.png
+        contentType: image/png
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: >-
+    Общий аплоад — используется и напрямую (вставка фото в family/Upsert.yml), и переиспользуется
+    эндпоинтами аватарок. Файл реально пишется в uploads/{id} на диске бэкенда.
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("returns a /api/media/{id} url", function () {
+          expect(res.body.url).to.match(/^\/api\/media\/[0-9a-f-]{36}$/);
+        });
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("media_url", res.body.url);
+          bru.setVar("media_id", res.body.url.split("/").pop());
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

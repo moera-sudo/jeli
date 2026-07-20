@@ -1,0 +1,32 @@
+info:
+  name: List Chats
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/chats"
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: "Список чатов user1 — из окна чата можно открыть профиль peer_user_id."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("includes the chat with user2", function () {
+          const chat = res.body.find((c) => c.id === bru.getVar("chat_id"));
+          expect(chat).to.not.equal(undefined);
+          expect(chat.peer_user_id).to.equal(bru.getVar("user_id_2"));
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
