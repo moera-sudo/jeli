@@ -2,6 +2,9 @@ name: local
 variables:
   - name: base_url
     value: http://localhost:8000/api
+  - name: ws_base_url
+    description: "WebSocket-версия base_url — для Jeli-Bruno/WebSocket.yml (единственный WS-эндпоинт /ws)."
+    value: ws://localhost:8000/api
   - name: access_token
     value: ""
   - name: refresh_token
