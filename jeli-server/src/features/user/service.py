@@ -70,3 +70,12 @@ async def update_profile(db: AsyncSession, user: User, data: dict) -> User:
     await db.refresh(user)
     logger.info("User profile updated: %s (fields=%s)", user.id, list(data.keys()))
     return user
+
+
+async def delete_user(db: AsyncSession, user: User) -> None:
+    # * graph-сторона (передача владения/каскад удаления графа) должна быть уже обработана ДО вызова —
+    # * см. graph.service.handle_account_deletion, вызываемый из user.router перед этой функцией.
+    user_id = user.id
+    await db.delete(user)
+    await db.commit()
+    logger.info("User account deleted: %s", user_id)

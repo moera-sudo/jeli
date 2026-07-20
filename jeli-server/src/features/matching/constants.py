@@ -35,6 +35,22 @@ MIGRATION_PLAUSIBILITY_DEFAULT = 0.15
 MATCH_HIGH_CONFIDENCE_THRESHOLD = 0.75
 MATCH_POSSIBLE_MATCH_THRESHOLD = 0.45
 
+# * Частые казахские имена (нормализованные, lower) — не из доки, введено как страховка от того,
+# * что на маленьком хакатон-датасете объективно частое имя даёт 0 совпадений в БД и ошибочно
+# * получает name_rarity_score=1.0 ("уникальное"). Список best-effort, не претендует на полноту.
+COMMON_KAZAKH_FIRST_NAMES: set[str] = {
+    "nurlan", "нурлан", "yerlan", "ерлан", "arman", "арман", "alibek", "алибек",
+    "bekzat", "бекзат", "dias", "диас", "daniyar", "данияр", "azamat", "азамат",
+    "askar", "аскар", "bauyrzhan", "бауыржан", "nurbol", "нурбол", "olzhas", "олжас",
+    "sanzhar", "санжар", "yerbol", "ербол", "kanat", "канат", "serik", "серик",
+    "talgat", "талгат", "marat", "марат", "yerzhan", "ержан", "bekarys", "бекарыс",
+    "aigerim", "айгерим", "aizhan", "айжан", "aidana", "айдана", "dana", "дана",
+    "dinara", "динара", "gulnara", "гульнара", "zhanar", "жанар", "madina", "мадина",
+    "saltanat", "салтанат", "aliya", "алия", "asel", "асель", "zhibek", "жибек",
+    "gulmira", "гульмира", "aruzhan", "аружан", "zere", "зере", "inkar", "инкар",
+    "nazerke", "назерке", "sabina", "сабина", "aisha", "айша",
+}
+
 # * Порог значимого изменения score для отправки уведомления (docs/matching-algorhitm.md, раздел 5).
 SIGNIFICANT_SCORE_DELTA = 0.15
 

@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.exceptions import ConflictError
 from src.features.graph.constants import (
+    DEFAULT_ETHNIC_SOURCE,
+    ETHNIC_SOURCE_DERIVED_FROM_RU,
     GRAPH_LINK_TYPE_MARRIAGE,
     GRAPH_LINK_TYPE_MATCH_CONFIRMED,
     MAX_PARENTS_PER_PERSON,
@@ -32,6 +34,7 @@ from src.features.graph.exceptions import (
     InvalidSuccessorError,
     InviteCodeNotFoundError,
     MarriageProposalNotFoundError,
+    MatchAlreadyResolvedError,
     MatchCandidateNotFoundError,
     NoDirectRelationshipError,
     NotLinkedPersonError,
@@ -41,6 +44,7 @@ from src.features.graph.exceptions import (
     PersonNotFoundError,
     ProposalAlreadyResolvedError,
     RelationshipNotFoundError,
+    RelationshipTypeMismatchError,
     SelfRelationshipError,
     SuccessorRequiredError,
     TooManyParentsError,
@@ -64,9 +68,11 @@ from src.features.graph.schemas import (
     PersonInsertBetweenRequest,
     PersonNode,
 )
+from src.features.graph.ru_taxonomy import derive_tribe_zhuz
 from src.features.graph.utils import build_display_name, generate_invite_code, normalize_name
 from src.features.notifications import service as notifications_service
 from src.features.notifications.constants import NOTIFICATION_TYPE_EXCLUDED_FROM_GRAPH
+from src.features.user import service as user_service
 from src.features.user.models import User
 
 logger = logging.getLogger(__name__)
@@ -149,7 +155,18 @@ async def get_ancestors_with_depth(db: AsyncSession, person_id: uuid.UUID) -> di
         """
     )
     result = await db.execute(sql, {"start_id": str(person_id)})
-    return {row.id: row.depth for row in result}
+    return _min_depth_per_id(result)
+
+
+def _min_depth_per_id(rows) -> dict[uuid.UUID, int]:
+    # ! Один и тот же предок может быть достижим на разных глубинах через разные линии (схлопывание
+    # ! родословной) — UNION в CTE дедуплицирует по (id, depth), а не по id, так что для одного id
+    # ! может прийти несколько строк. Берём МИНИМАЛЬНУЮ глубину — ближайшее родство, детерминированно.
+    depths: dict[uuid.UUID, int] = {}
+    for row in rows:
+        if row.id not in depths or row.depth < depths[row.id]:
+            depths[row.id] = row.depth
+    return depths
 
 
 async def get_descendants_with_depth(db: AsyncSession, person_id: uuid.UUID) -> dict[uuid.UUID, int]:
@@ -166,7 +183,7 @@ async def get_descendants_with_depth(db: AsyncSession, person_id: uuid.UUID) -> 
         """
     )
     result = await db.execute(sql, {"start_id": str(person_id)})
-    return {row.id: row.depth for row in result}
+    return _min_depth_per_id(result)
 
 
 async def get_full_household_person_ids(db: AsyncSession, root_person_id: uuid.UUID) -> set[uuid.UUID]:
@@ -192,7 +209,7 @@ async def get_full_household_person_ids(db: AsyncSession, root_person_id: uuid.U
                 SELECT CASE WHEN r.from_person_id = h.person_id THEN r.to_person_id ELSE r.from_person_id END, 1
                 FROM relationships r
                 WHERE (r.from_person_id = h.person_id OR r.to_person_id = h.person_id)
-                  AND r.type = 'spouse_of' AND h.affinal_hops = 0
+                  AND r.type = 'spouse_of' AND h.affinal_hops = 0 AND r.marriage_end_reason IS NULL
                 UNION ALL
                 SELECT CASE WHEN gl.person_a_id = h.person_id THEN gl.person_b_id ELSE gl.person_a_id END, 0
                 FROM graph_links gl
@@ -428,6 +445,7 @@ def to_match_read(
 
 
 async def get_person_matches(db: AsyncSession, person_id: uuid.UUID) -> list[MatchCandidate]:
+    await get_person_or_404(db, person_id)
     result = await db.execute(
         select(MatchCandidate)
         .where((MatchCandidate.person_a_id == person_id) | (MatchCandidate.person_b_id == person_id))
@@ -437,6 +455,9 @@ async def get_person_matches(db: AsyncSession, person_id: uuid.UUID) -> list[Mat
 
 
 async def get_user_matches(db: AsyncSession, target_user_id: uuid.UUID) -> list[MatchCandidate]:
+    # ! 404 на несуществующего пользователя — отсутствие СВЯЗАННОГО узла (ещё не создал дерево) при
+    # ! этом остаётся валидным состоянием и отдаёт пустой список, а не ошибку.
+    await user_service.get_by_id_or_404(db, target_user_id)
     root = await get_linked_person(db, target_user_id)
     if root is None:
         return []
@@ -494,11 +515,28 @@ async def get_person_detail(db: AsyncSession, person_id: uuid.UUID, current_user
     )
 
 
+def _blank_to_none(value: str | None) -> str | None:
+    # ! "" и None должны быть эквивалентны "не заполнено" — иначе geo_similarity/ethnic_lineage_modifier
+    # ! в мэтчинге по-разному трактуют пустую строку в зависимости от того, is_not(None) или truthy-чек.
+    return None if value == "" else value
+
+
 def _build_person(
     owner_user_id: uuid.UUID,
     data: "PersonCreateRequest | PersonInsertBetweenRequest",
     origin_label: uuid.UUID | None = None,
 ) -> Person:
+    ru = _blank_to_none(data.ru)
+    tribe = _blank_to_none(data.tribe)
+    zhuz = _blank_to_none(data.zhuz)
+    ethnic_source = DEFAULT_ETHNIC_SOURCE
+    if ru and tribe is None and zhuz is None:
+        # * Автоподстановка племени/жуза по ру (docs/matching-algorhitm.md §4) — только если клиент
+        # * их явно не указал сам (не затираем ручной ввод).
+        derived = derive_tribe_zhuz(ru)
+        if derived is not None:
+            tribe, zhuz = derived
+            ethnic_source = ETHNIC_SOURCE_DERIVED_FROM_RU
     return Person(
         owner_user_id=owner_user_id,
         origin_label=origin_label or uuid.uuid4(),
@@ -514,11 +552,12 @@ def _build_person(
         death_year_value=data.death_year_value,
         death_year_precision=data.death_year_precision,
         death_context=data.death_context,
-        birth_country=data.birth_country,
-        birth_region=data.birth_region,
-        ru=data.ru,
-        tribe=data.tribe,
-        zhuz=data.zhuz,
+        birth_country=_blank_to_none(data.birth_country),
+        birth_region=_blank_to_none(data.birth_region),
+        ru=ru,
+        tribe=tribe,
+        zhuz=zhuz,
+        ethnic_source=ethnic_source,
         source_type=data.source_type,
         has_attached_file=data.has_attached_file,
         file_url=data.file_url,
@@ -641,8 +680,18 @@ async def _create_person_with_relation(db: AsyncSession, current_user: User, dat
 async def update_person(db: AsyncSession, person: Person, current_user: User, data: dict) -> Person:
     if not await can_edit_person(db, current_user, person):
         raise NotPersonOwnerError()
+    for field in ("ru", "tribe", "zhuz", "birth_country", "birth_region"):
+        if field in data:
+            data[field] = _blank_to_none(data[field])
     for field, value in data.items():
         setattr(person, field, value)
+    if "ru" in data and "tribe" not in data and "zhuz" not in data:
+        # * Автоподстановка племени/жуза по обновлённому ру — только если клиент их явно не правит
+        # * этим же запросом (не затираем ручной ввод).
+        derived = derive_tribe_zhuz(person.ru)
+        if derived is not None:
+            person.tribe, person.zhuz = derived
+            person.ethnic_source = ETHNIC_SOURCE_DERIVED_FROM_RU
     if data.keys() & {"last_name", "first_name", "patronymic"}:
         # ! Пересчёт normalized_name ОБЯЗАТЕЛЕН при правке любой части имени — иначе pg_trgm-индекс,
         # ! используемый мэтчингом, тихо расходится с актуальными данными узла.
@@ -679,6 +728,32 @@ async def get_successor_candidates(db: AsyncSession, current_user: User) -> list
 async def transfer_ownership(db: AsyncSession, from_user_id: uuid.UUID, to_user_id: uuid.UUID) -> None:
     await db.execute(update(Person).where(Person.owner_user_id == from_user_id).values(owner_user_id=to_user_id))
     logger.info("Graph ownership transferred: %s -> %s", from_user_id, to_user_id)
+
+
+async def _owns_any_person(db: AsyncSession, user_id: uuid.UUID) -> bool:
+    result = await db.execute(select(func.count()).select_from(Person).where(Person.owner_user_id == user_id))
+    return result.scalar_one() > 0
+
+
+async def handle_account_deletion(db: AsyncSession, user: User, new_owner_user_id: uuid.UUID | None) -> None:
+    # * Вызывается ПЕРЕД удалением самого User (см. user.router.delete_account). Отвечает только за
+    # * graph-сторону: смысл всей функции — либо передать владение графом, либо дать каскаду отработать.
+    # * persons.owner_user_id -> ondelete=CASCADE: если владение НЕ передать здесь, удаление User ниже
+    # * каскадно удалит весь граф целиком (осознанное поведение, когда передавать некому).
+    # * persons.linked_user_id -> ondelete=SET NULL: свой собственный узел переживёт удаление аккаунта
+    # * автоматически, БЕЗ какого-либо кода здесь — узел просто отвяжется, данные не пропадут.
+    if not await _owns_any_person(db, user.id):
+        return
+    candidates = await get_successor_candidates(db, user)
+    if not candidates:
+        logger.info("User %s is sole graph owner with no successor — graph will cascade-delete with the account", user.id)
+        return
+    if new_owner_user_id is None:
+        raise SuccessorRequiredError()
+    if new_owner_user_id not in {candidate.id for candidate in candidates}:
+        raise InvalidSuccessorError()
+    await transfer_ownership(db, user.id, new_owner_user_id)
+    logger.info("Graph ownership transferred before account deletion: %s -> %s", user.id, new_owner_user_id)
 
 
 async def delete_person(
@@ -835,7 +910,7 @@ async def create_relationship(db: AsyncSession, current_user: User, from_person_
     return rel
 
 
-async def delete_relationship(db: AsyncSession, relationship_id: uuid.UUID, current_user: User) -> None:
+async def delete_relationship(db: AsyncSession, relationship_id: uuid.UUID, current_user: User) -> tuple[uuid.UUID, uuid.UUID]:
     result = await db.execute(select(Relationship).where(Relationship.id == relationship_id))
     rel = result.scalar_one_or_none()
     if rel is None:
@@ -850,6 +925,7 @@ async def delete_relationship(db: AsyncSession, relationship_id: uuid.UUID, curr
     await db.delete(rel)
     await db.commit()
     logger.info("Relationship deleted: %s", relationship_id)
+    return from_person.id, to_person.id
 
 
 async def update_relationship(db: AsyncSession, relationship_id: uuid.UUID, current_user: User, data: dict) -> Relationship:
@@ -866,6 +942,8 @@ async def update_relationship(db: AsyncSession, relationship_id: uuid.UUID, curr
         or await can_edit_graph(db, current_user.id, to_person.owner_user_id)
     ):
         raise NotPersonOwnerError()
+    if data.keys() & {"marriage_year", "marriage_end_reason"} and rel.type != RELATIONSHIP_TYPE_SPOUSE_OF:
+        raise RelationshipTypeMismatchError()
     for field, value in data.items():
         setattr(rel, field, value)
     await db.commit()
@@ -931,6 +1009,22 @@ async def create_marriage_proposal(db: AsyncSession, current_user: User, data: M
     )
     if duplicate.scalar_one_or_none() is not None:
         raise DuplicateProposalError()
+
+    existing_marriage = await db.execute(
+        select(Relationship).where(
+            Relationship.type == RELATIONSHIP_TYPE_SPOUSE_OF,
+            (
+                (Relationship.from_person_id == person_a.id) & (Relationship.to_person_id == person_b.id)
+            )
+            | (
+                (Relationship.from_person_id == person_b.id) & (Relationship.to_person_id == person_a.id)
+            ),
+        )
+    )
+    if existing_marriage.scalar_one_or_none() is not None:
+        # ! Без этой проверки: та же пара направление-в-направление уронит IntegrityError (500) на
+        # ! уникальном ограничении ребра, а обратное направление тихо создаст вторую связь брака.
+        raise DuplicateRelationshipError()
 
     if can_edit_a and can_edit_b:
         rel = Relationship(
@@ -1048,6 +1142,11 @@ async def confirm_match(db: AsyncSession, match: MatchCandidate, current_user: U
     is_b_side = await can_edit_graph(db, current_user.id, person_b.owner_user_id)
     if not (is_a_side or is_b_side):
         raise NotMatchParticipantError()
+    if match.confirmed_at is not None:
+        raise MatchAlreadyResolvedError()
+    if (is_a_side and match.person_a_rejected) or (is_b_side and match.person_b_rejected):
+        # ! Эта же сторона уже отклонила мэтч — нельзя одновременно confirmed=True и rejected=True.
+        raise MatchAlreadyResolvedError()
 
     if is_a_side:
         match.person_a_confirmed = True
@@ -1075,6 +1174,11 @@ async def reject_match(db: AsyncSession, match: MatchCandidate, current_user: Us
     is_b_side = await can_edit_graph(db, current_user.id, person_b.owner_user_id)
     if not (is_a_side or is_b_side):
         raise NotMatchParticipantError()
+    if match.confirmed_at is not None:
+        raise MatchAlreadyResolvedError()
+    if (is_a_side and match.person_a_confirmed) or (is_b_side and match.person_b_confirmed):
+        # ! Эта же сторона уже подтвердила мэтч — нельзя одновременно confirmed=True и rejected=True.
+        raise MatchAlreadyResolvedError()
     if is_a_side:
         match.person_a_rejected = True
     if is_b_side:

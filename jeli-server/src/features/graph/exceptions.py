@@ -96,3 +96,7 @@ class SuccessorRequiredError(ConflictError):
 
 class InvalidSuccessorError(ConflictError):
     message = "Selected successor is not a valid candidate"
+
+
+class RelationshipTypeMismatchError(ConflictError):
+    message = "Marriage fields (marriage_year, marriage_end_reason) only apply to spouse_of relationships"

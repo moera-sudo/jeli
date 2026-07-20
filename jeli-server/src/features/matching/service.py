@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.database import AsyncSessionLocal
@@ -56,6 +57,7 @@ async def find_candidates(db: AsyncSession, person: Person) -> list[Person]:
         WHERE p1.id = :person_id
           AND p2.id != p1.id
           AND p1.owner_user_id != p2.owner_user_id
+          AND p1.origin_label != p2.origin_label
           AND p1.normalized_name != ''
           AND p2.normalized_name != ''
         ORDER BY
@@ -126,15 +128,25 @@ async def align_and_score(
     persons_by_id = await _load_persons_by_id(db, all_ids)
 
     node_matches: list[NodeMatch] = []
+    # ! Кандидатский узел, уже использованный на одном уровне поколения, исключается из следующих —
+    # ! иначе один и тот же предок (попадающий в несколько перекрывающихся окон допуска ±2) может
+    # ! "закрыть" сразу несколько соседних уровней и искусственно раздуть chain_length.
+    used_candidate_ids: set[uuid.UUID] = set()
 
     for gen in range(0, MAX_CHAIN_DEPTH + 1):
         person_side_ids = [person.id] if gen == 0 else person_by_depth.get(gen, [])
         if not person_side_ids:
             continue
 
-        candidate_side_ids: set[uuid.UUID] = set()
-        for tol_gen in range(max(0, gen - GEN_OFFSET_TOLERANCE), gen + GEN_OFFSET_TOLERANCE + 1):
-            candidate_side_ids.update([candidate.id] if tol_gen == 0 else candidate_by_depth.get(tol_gen, []))
+        if gen == 0:
+            # * gen=0 — это и есть якорная пара из Stage 1: сравниваем ТОЛЬКО person с candidate,
+            # * без допуска ±2 (иначе "совпадение" может оказаться с отцом/дедом candidate, а не с ним).
+            candidate_side_ids = {candidate.id}
+        else:
+            candidate_side_ids = set()
+            for tol_gen in range(max(0, gen - GEN_OFFSET_TOLERANCE), gen + GEN_OFFSET_TOLERANCE + 1):
+                candidate_side_ids.update([candidate.id] if tol_gen == 0 else candidate_by_depth.get(tol_gen, []))
+        candidate_side_ids -= used_candidate_ids
         if not candidate_side_ids:
             continue
 
@@ -155,8 +167,11 @@ async def align_and_score(
         if not confident_pairs:
             continue
         best = max(confident_pairs, key=lambda m: m.confidence)
-        best.sibling_count = len(confident_pairs)
+        # * Различные person-side узлы с уверенным совпадением на этом уровне (напр. отец и мать) —
+        # * а не количество пар (один предок × N кандидатов в допуске ±2 — это не N сиблингов).
+        best.sibling_count = len({m.person_a.id for m in confident_pairs})
         node_matches.append(best)
+        used_candidate_ids.add(best.person_b.id)
 
     if not any(m.gen == 0 for m in node_matches):
         # * Даже сама пара-кандидат из Stage 1 не прошла hard-reject/порог confidence — discard сразу.
@@ -172,6 +187,12 @@ async def align_and_score(
     else:
         status = MATCH_STATUS_DISCARD
 
+    # * evidence всегда подписывается в том же порядке, что канонические колонки MatchCandidate
+    # * (person_a/person_b по str(id)) — иначе при развороте канонического порядка подписи внутри
+    # * evidence.chain перестают соответствовать match.person_a_id/match.person_b_id.
+    canonical_a, _ = _canonical_order(person, candidate)
+    swap_evidence = canonical_a.id != person.id
+
     evidence = {
         "chain_length": longest_continuous_chain(node_matches),
         "sibling_confirmed": has_sibling_match(node_matches),
@@ -180,10 +201,18 @@ async def align_and_score(
         "chain": [
             {
                 "generation": m.gen,
-                "person_a_id": str(m.person_a.id),
-                "person_a_name": build_display_name(m.person_a.last_name, m.person_a.first_name, m.person_a.patronymic),
-                "person_b_id": str(m.person_b.id),
-                "person_b_name": build_display_name(m.person_b.last_name, m.person_b.first_name, m.person_b.patronymic),
+                "person_a_id": str((m.person_b if swap_evidence else m.person_a).id),
+                "person_a_name": build_display_name(
+                    (m.person_b if swap_evidence else m.person_a).last_name,
+                    (m.person_b if swap_evidence else m.person_a).first_name,
+                    (m.person_b if swap_evidence else m.person_a).patronymic,
+                ),
+                "person_b_id": str((m.person_a if swap_evidence else m.person_b).id),
+                "person_b_name": build_display_name(
+                    (m.person_a if swap_evidence else m.person_b).last_name,
+                    (m.person_a if swap_evidence else m.person_b).first_name,
+                    (m.person_a if swap_evidence else m.person_b).patronymic,
+                ),
                 "confidence": round(m.confidence, 4),
                 "name_similarity": round(
                     normalized_name_similarity(m.person_a.normalized_name, m.person_b.normalized_name), 4
@@ -225,6 +254,12 @@ async def _upsert_match(db: AsyncSession, person: Person, candidate: Person, fin
     match = result.scalar_one_or_none()
     now = datetime.now(timezone.utc)
 
+    if match is not None and (match.confirmed_at is not None or match.person_a_rejected or match.person_b_rejected):
+        # ! Подтверждённое/отклонённое обеими сторонами решение — финальное. Фоновый пересчёт
+        # ! не имеет права тихо перезаписать его score/status (например, обратно на discard).
+        logger.info("Match %s already resolved (confirmed/rejected) — skipping recompute overwrite", match.id)
+        return
+
     if match is None:
         match = MatchCandidate(
             person_a_id=person_a.id,
@@ -265,7 +300,14 @@ async def recompute_for_person(db: AsyncSession, person_id: uuid.UUID) -> None:
         if candidate.gender != person.gender:
             continue  # ! hard reject: не сравниваем и не создаём MatchCandidate вообще
         final_score, status, evidence = await align_and_score(db, person, person_ancestors, candidate, rarity_cache)
-        await _upsert_match(db, person, candidate, final_score, status, evidence)
+        try:
+            await _upsert_match(db, person, candidate, final_score, status, evidence)
+        except IntegrityError:
+            # ! Гонка: параллельный пересчёт другой стороны этой же пары уже вставил строку между
+            # ! нашим select и insert (уникальный констрейнт на пару). Откатываем и переходим к
+            # ! следующему кандидату — запись всё равно корректно создана параллельным таском.
+            await db.rollback()
+            logger.warning("Match upsert race for pair (%s, %s) — skipped, handled by concurrent task", person.id, candidate.id)
 
 
 async def recompute_for_person_task(person_id: uuid.UUID) -> None:

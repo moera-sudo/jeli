@@ -6,6 +6,7 @@ from rapidfuzz import fuzz
 from src.features.graph.models import Person
 from src.features.matching.constants import (
     CHAIN_LENGTH_MULTIPLIER,
+    COMMON_KAZAKH_FIRST_NAMES,
     MIGRATION_PLAUSIBILITY,
     MIGRATION_PLAUSIBILITY_DEFAULT,
     RU_BONUS,
@@ -32,8 +33,16 @@ def normalized_name_similarity(name_a: str, name_b: str) -> float:
     return fuzz.ratio(name_a, name_b) / 100.0
 
 
-def name_rarity_score(count: int) -> float:
+def name_rarity_score(first_name: str, count: int) -> float:
     # * count — сколько ДРУГИХ persons в базе имеют то же normalized_name (без self).
+    # ! На маленькой БД объективно частое имя может иметь count=0 и ошибочно выглядеть уникальным —
+    # ! COMMON_KAZAKH_FIRST_NAMES подстраховывает верхнюю границу для таких имён вне зависимости от БД.
+    if first_name.strip().lower() in COMMON_KAZAKH_FIRST_NAMES:
+        return min(0.4, _count_based_rarity(count))
+    return _count_based_rarity(count)
+
+
+def _count_based_rarity(count: int) -> float:
     if count == 0:
         return 1.0
     if count <= 2:
@@ -90,7 +99,7 @@ def ethnic_lineage_modifier(a: Person, b: Person) -> float:
 def node_confidence(a: Person, b: Person, gen_a: int, gen_b: int, name_rarity_count: int) -> float:
     # ! Вызывающая сторона ОБЯЗАНА проверить a.gender == b.gender до вызова (hard reject вне скоринга).
     name_sim = normalized_name_similarity(a.normalized_name, b.normalized_name)
-    rarity = name_rarity_score(name_rarity_count)
+    rarity = name_rarity_score(a.first_name or "", name_rarity_count)
     geo = geo_similarity(a, b)
     gen_plausibility = gen_offset_score(a, b, gen_a, gen_b)
     ethnic_mod = ethnic_lineage_modifier(a, b)

@@ -130,10 +130,12 @@ async def create_person(
 )
 async def insert_person_between(
     payload: PersonInsertBetweenRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),
 ) -> PersonDetail:
     person = await graph_service.insert_person_between(db, current_user, payload)
+    background_tasks.add_task(matching_service.recompute_for_person_task, person.id)
     return await graph_service.get_person_detail(db, person.id, current_user)
 
 
@@ -302,10 +304,13 @@ async def get_household_graph(
 )
 async def create_relationship(
     payload: RelationshipCreateRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),
 ) -> RelationshipRead:
     rel = await graph_service.create_relationship(db, current_user, payload.from_person_id, payload.to_person_id)
+    background_tasks.add_task(matching_service.recompute_for_person_task, rel.from_person_id)
+    background_tasks.add_task(matching_service.recompute_for_person_task, rel.to_person_id)
     return RelationshipRead.model_validate(rel)
 
 
@@ -337,10 +342,13 @@ async def update_relationship(
 )
 async def delete_relationship(
     id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),
 ) -> None:
-    await graph_service.delete_relationship(db, id, current_user)
+    from_person_id, to_person_id = await graph_service.delete_relationship(db, id, current_user)
+    background_tasks.add_task(matching_service.recompute_for_person_task, from_person_id)
+    background_tasks.add_task(matching_service.recompute_for_person_task, to_person_id)
 
 
 @router.post(
