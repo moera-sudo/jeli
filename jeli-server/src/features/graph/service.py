@@ -64,7 +64,7 @@ from src.features.graph.schemas import (
     PersonInsertBetweenRequest,
     PersonNode,
 )
-from src.features.graph.utils import generate_invite_code, normalize_name
+from src.features.graph.utils import build_display_name, generate_invite_code, normalize_name
 from src.features.notifications import service as notifications_service
 from src.features.notifications.constants import NOTIFICATION_TYPE_EXCLUDED_FROM_GRAPH
 from src.features.user.models import User
@@ -234,7 +234,9 @@ async def _load_person_nodes(db: AsyncSession, generation: dict[uuid.UUID, int],
         nodes.append(
             PersonNode(
                 id=person.id,
-                full_name=person.full_name,
+                last_name=person.last_name,
+                first_name=person.first_name,
+                patronymic=person.patronymic,
                 gender=person.gender,
                 avatar_url=person.avatar_url,
                 generation=generation[person.id],
@@ -462,7 +464,9 @@ async def get_person_detail(db: AsyncSession, person_id: uuid.UUID, current_user
         id=person.id,
         owner_user_id=person.owner_user_id,
         linked_user_id=person.linked_user_id,
-        full_name=person.full_name,
+        last_name=person.last_name,
+        first_name=person.first_name,
+        patronymic=person.patronymic,
         gender=person.gender,
         avatar_url=person.avatar_url,
         is_alive=person.is_alive,
@@ -498,8 +502,10 @@ def _build_person(
     return Person(
         owner_user_id=owner_user_id,
         origin_label=origin_label or uuid.uuid4(),
-        full_name=data.full_name,
-        normalized_name=normalize_name(data.full_name),
+        last_name=data.last_name,
+        first_name=data.first_name,
+        patronymic=data.patronymic,
+        normalized_name=normalize_name(data.last_name, data.first_name, data.patronymic),
         gender=data.gender,
         avatar_url=data.avatar_url,
         is_alive=data.is_alive,
@@ -637,6 +643,10 @@ async def update_person(db: AsyncSession, person: Person, current_user: User, da
         raise NotPersonOwnerError()
     for field, value in data.items():
         setattr(person, field, value)
+    if data.keys() & {"last_name", "first_name", "patronymic"}:
+        # ! Пересчёт normalized_name ОБЯЗАТЕЛЕН при правке любой части имени — иначе pg_trgm-индекс,
+        # ! используемый мэтчингом, тихо расходится с актуальными данными узла.
+        person.normalized_name = normalize_name(person.last_name, person.first_name, person.patronymic)
     if data:
         db.add(PersonEditLog(person_id=person.id, changed_fields=data))
     await db.commit()
@@ -705,7 +715,10 @@ async def delete_person(
             db,
             excluded_user_id,
             NOTIFICATION_TYPE_EXCLUDED_FROM_GRAPH,
-            {"person_id": str(person.id), "person_full_name": person.full_name},
+            {
+                "person_id": str(person.id),
+                "person_display_name": build_display_name(person.last_name, person.first_name, person.patronymic),
+            },
         )
         logger.info("User %s excluded from graph, person %s unlinked", excluded_user_id, person.id)
 
@@ -746,8 +759,10 @@ async def create_root_person_for_user(db: AsyncSession, user: User) -> Person:
         owner_user_id=user.id,
         linked_user_id=user.id,
         origin_label=uuid.uuid4(),
-        full_name=user.full_name,
-        normalized_name=normalize_name(user.full_name),
+        last_name=user.last_name,
+        first_name=user.first_name,
+        patronymic=user.patronymic,
+        normalized_name=normalize_name(user.last_name, user.first_name, user.patronymic),
         gender=user.gender,
         avatar_url=user.avatar_url,
         is_alive=True,

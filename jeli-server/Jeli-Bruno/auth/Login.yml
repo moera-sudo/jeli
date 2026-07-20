@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: http://localhost:8000/api/auth/login
+  url: "{{base_url}}/auth/login"
   body:
     type: json
     data: |-
@@ -14,6 +14,25 @@ http:
         "password": "string123"
       }
   auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("returns access and refresh tokens", function () {
+          expect(res.body.access_token).to.be.a("string");
+          expect(res.body.refresh_token).to.be.a("string");
+        });
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("access_token", res.body.access_token);
+          bru.setVar("refresh_token", res.body.refresh_token);
+        }
 
 settings:
   encodeUrl: true

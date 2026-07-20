@@ -5,10 +5,30 @@ info:
 
 http:
   method: POST
-  url: http://localhost:8000/api/graph/create
+  url: "{{base_url}}/graph/create"
   auth:
     type: bearer
-    token: PASTE_ACCESS_TOKEN_HERE
+    token: "{{access_token}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |
+        test("creates the root person, or reports one already exists", function () {
+          expect([200, 409]).to.include(res.status);
+        });
+        if (res.status === 200) {
+          test("root person is linked to the current account", function () {
+            expect(res.body.id).to.be.a("string");
+            expect(res.body.linked_user_id).to.be.a("string");
+          });
+        }
+    - type: after-response
+      code: |
+        // ! Только при успехе — иначе на конфликте (409, граф уже создан) затрёт валидный person_id.
+        if (res.status === 200) {
+          bru.setVar("person_id", res.body.id);
+        }
 
 settings:
   encodeUrl: true

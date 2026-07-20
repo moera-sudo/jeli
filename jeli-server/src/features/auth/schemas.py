@@ -7,7 +7,9 @@ from src.features.user.schemas import OptionalProfileFields, UserMe
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    full_name: str = Field(min_length=1, max_length=255)
+    last_name: str = Field(min_length=1, max_length=255)
+    first_name: str = Field(min_length=1, max_length=255)
+    patronymic: str | None = None
     # * Best-effort линковка к существующему узлу графа (см. graph.service.link_existing_person_by_invite_code).
     # * Дерево при регистрации больше не создаётся автоматически — см. POST /graph/create, /graph/join.
     graph_invite_code: str | None = None

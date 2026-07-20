@@ -5,8 +5,20 @@ info:
 
 http:
   method: GET
-  url: http://localhost:8000/api/health
+  url: "{{base_url}}/health"
   auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("service reports ok", function () {
+          expect(res.body.status).to.equal("ok");
+        });
 
 settings:
   encodeUrl: true

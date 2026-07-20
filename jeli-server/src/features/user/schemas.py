@@ -31,7 +31,9 @@ class UserMe(BaseModel):
 
     id: uuid.UUID
     email: EmailStr
-    full_name: str
+    last_name: str | None
+    first_name: str | None
+    patronymic: str | None
     avatar_url: str
     gender: Gender | None
     current_city: str | None
@@ -54,7 +56,9 @@ class UserPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    full_name: str
+    last_name: str | None
+    first_name: str | None
+    patronymic: str | None
     avatar_url: str
     gender: Gender | None
     current_city: str | None
@@ -71,11 +75,13 @@ class UserPublic(BaseModel):
 
 
 class ProfileCreateRequest(OptionalProfileFields):
-    # * POST /users/create — доп.поля профиля без full_name.
+    # * POST /users/create — доп.поля профиля без last_name/first_name/patronymic (задаются при регистрации).
     avatar_url: str | None = None
 
 
 class ProfileUpdateRequest(OptionalProfileFields):
-    # * PATCH /users/profile/edit — то же самое плюс full_name.
-    full_name: str | None = None
+    # * PATCH /users/profile/edit — то же самое плюс имя.
+    last_name: str | None = None
+    first_name: str | None = None
+    patronymic: str | None = None
     avatar_url: str | None = None

@@ -5,10 +5,20 @@ info:
 
 http:
   method: POST
-  url: http://localhost:8000/api/matches/77777777-7777-7777-7777-777777777777/reject
+  url: "{{base_url}}/matches/{{match_id}}/reject"
   auth:
     type: bearer
-    token: PASTE_ACCESS_TOKEN_HERE
+    token: "{{access_token}}"
+  docs: >-
+    Отклоняет тот же {{match_id}}, что уже мог быть подтверждён через Confirm.yml — см. пояснение там.
+
+runtime:
+  scripts:
+    - type: tests
+      code: |
+        test("rejects the match, or reports it doesn't exist / is already resolved", function () {
+          expect([200, 404, 409]).to.include(res.status);
+        });
 
 settings:
   encodeUrl: true

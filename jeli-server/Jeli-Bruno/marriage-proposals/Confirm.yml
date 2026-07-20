@@ -5,10 +5,22 @@ info:
 
 http:
   method: POST
-  url: http://localhost:8000/api/marriage-proposals/66666666-6666-6666-6666-666666666666/confirm
+  url: "{{base_url}}/marriage-proposals/{{proposal_id}}/confirm"
   auth:
     type: bearer
-    token: PASTE_ACCESS_TOKEN_HERE
+    token: "{{access_token}}"
+  docs: >-
+    Подтвердить может только владелец второй стороны (не person_a) — при линейном прогоне одним
+    аккаунтом ожидаем 403 NotProposalResponderError, если target_invite_code вёл к чужому владельцу,
+    либо 409, если уже подтверждено/отклонено.
+
+runtime:
+  scripts:
+    - type: tests
+      code: |
+        test("confirms, or reports permission/already-resolved", function () {
+          expect([200, 403, 409]).to.include(res.status);
+        });
 
 settings:
   encodeUrl: true

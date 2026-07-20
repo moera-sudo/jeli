@@ -5,10 +5,22 @@ info:
 
 http:
   method: GET
-  url: http://localhost:8000/api/marriage-proposals/66666666-6666-6666-6666-666666666666
+  url: "{{base_url}}/marriage-proposals/{{proposal_id}}"
   auth:
     type: bearer
-    token: PASTE_ACCESS_TOKEN_HERE
+    token: "{{access_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("returns the proposal detail", function () {
+          expect(res.body.id).to.equal(bru.getVar("proposal_id"));
+        });
 
 settings:
   encodeUrl: true

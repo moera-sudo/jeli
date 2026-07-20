@@ -5,7 +5,7 @@ info:
 
 http:
   method: PATCH
-  url: http://localhost:8000/api/relationships/55555555-5555-5555-5555-555555555555
+  url: "{{base_url}}/relationships/{{relationship_id}}"
   body:
     type: json
     data: |-
@@ -15,7 +15,20 @@ http:
       }
   auth:
     type: bearer
-    token: PASTE_ACCESS_TOKEN_HERE
+    token: "{{access_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("applies the marriage history update", function () {
+          expect(res.body.marriage_year).to.equal(2010);
+          expect(res.body.marriage_end_reason).to.equal("divorce");
+        });
 
 settings:
   encodeUrl: true

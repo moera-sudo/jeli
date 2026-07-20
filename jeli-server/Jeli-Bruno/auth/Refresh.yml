@@ -5,14 +5,33 @@ info:
 
 http:
   method: POST
-  url: http://localhost:8000/api/auth/refresh
+  url: "{{base_url}}/auth/refresh"
   body:
     type: json
     data: |-
       {
-        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkM2M4NWVjYi1jZmY2LTQ0NDMtOTlmYy0wMWMwODcyZDlmNGIiLCJ0eXBlIjoicmVmcmVzaCIsImlhdCI6MTc4NDM4NzkzNiwiZXhwIjoxNzg0NDc0MzM2fQ.qYjrOEKI6gDuwV0VKpgWntGPD4OMijstXn1bTEom-xY"
+        "refresh_token": "{{refresh_token}}"
       }
   auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("returns a rotated token pair", function () {
+          expect(res.body.access_token).to.be.a("string");
+          expect(res.body.refresh_token).to.be.a("string");
+        });
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("access_token", res.body.access_token);
+          bru.setVar("refresh_token", res.body.refresh_token);
+        }
 
 settings:
   encodeUrl: true

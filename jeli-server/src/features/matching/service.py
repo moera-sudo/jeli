@@ -15,6 +15,7 @@ from src.features.graph.constants import (
     MATCH_STATUS_POSSIBLE_MATCH,
 )
 from src.features.graph.models import MatchCandidate, Person
+from src.features.graph.utils import build_display_name
 from src.features.matching.constants import (
     CANDIDATE_LIMIT,
     CANDIDATE_NAME_SIMILARITY_THRESHOLD,
@@ -55,6 +56,8 @@ async def find_candidates(db: AsyncSession, person: Person) -> list[Person]:
         WHERE p1.id = :person_id
           AND p2.id != p1.id
           AND p1.owner_user_id != p2.owner_user_id
+          AND p1.normalized_name != ''
+          AND p2.normalized_name != ''
         ORDER BY
           CASE
             WHEN p1.birth_country IS NULL OR p2.birth_country IS NULL THEN 0.5
@@ -178,9 +181,9 @@ async def align_and_score(
             {
                 "generation": m.gen,
                 "person_a_id": str(m.person_a.id),
-                "person_a_name": m.person_a.full_name,
+                "person_a_name": build_display_name(m.person_a.last_name, m.person_a.first_name, m.person_a.patronymic),
                 "person_b_id": str(m.person_b.id),
-                "person_b_name": m.person_b.full_name,
+                "person_b_name": build_display_name(m.person_b.last_name, m.person_b.first_name, m.person_b.patronymic),
                 "confidence": round(m.confidence, 4),
                 "name_similarity": round(
                     normalized_name_similarity(m.person_a.normalized_name, m.person_b.normalized_name), 4

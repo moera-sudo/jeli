@@ -13,6 +13,35 @@ config:
         username: ""
         password: ""
       bypassProxy: ""
+  environments:
+    - name: Local
+      variables:
+        - name: base_url
+          value: http://localhost:8000/api
+        - name: access_token
+          value: ""
+        - name: refresh_token
+          value: ""
+        - name: user_id
+          value: ""
+        - name: person_id
+          value: ""
+        - name: target_person_id
+          value: ""
+        - name: relationship_id
+          value: ""
+        - name: proposal_id
+          value: ""
+        - name: match_id
+          value: ""
+        - name: invite_code
+          value: ""
+        - name: collaborator_user_id
+          description: >-
+            ID второго зарегистрированного пользователя — нужен для graph/collaborators/Grant и Revoke,
+            persons/Delete(new_owner_user_id). Не заполняется автоматически (требует второй Register),
+            вписать вручную после ручного прогона auth/Register под другим email.
+          value: ""
 bundled: false
 extensions:
   bruno:
@@ -22,4 +51,4 @@ extensions:
     presets:
       request:
         type: http
-        url: http://localhost:8000/api/
+        url: "{{base_url}}/"

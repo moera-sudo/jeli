@@ -5,18 +5,39 @@ info:
 
 http:
   method: POST
-  url: http://localhost:8000/api/relationships
+  url: "{{base_url}}/relationships"
   body:
     type: json
     data: |-
       {
-        "from_person_id": "33333333-3333-3333-3333-333333333333",
-        "to_person_id": "44444444-4444-4444-4444-444444444444",
+        "from_person_id": "{{person_id}}",
+        "to_person_id": "{{target_person_id}}",
         "type": "child_of"
       }
   auth:
     type: bearer
-    token: PASTE_ACCESS_TOKEN_HERE
+    token: "{{access_token}}"
+  docs: >-
+    person_id/target_person_id могут уже быть напрямую связаны (persons/Create.yml создаёт их как
+    parent/child) — в этом случае ожидаем 409 DuplicateRelationshipError, а не 200.
+
+runtime:
+  scripts:
+    - type: tests
+      code: |
+        test("either creates the edge (200) or reports a duplicate (409)", function () {
+          expect([200, 409]).to.include(res.status);
+        });
+        if (res.status === 200) {
+          test("created edge has the right type", function () {
+            expect(res.body.type).to.equal("child_of");
+          });
+        }
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("relationship_id", res.body.id);
+        }
 
 settings:
   encodeUrl: true
