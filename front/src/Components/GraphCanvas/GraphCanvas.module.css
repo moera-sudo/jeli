@@ -316,6 +316,28 @@
 .detailClose:hover { background: #f4f4f5; }
 .detailClose svg { width: 18px; height: 18px; }
 
+/* Registered-member modal — the full profile-page layout inside a dialog. */
+.memberModalCard {
+  position: relative;
+  width: min(1040px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  background: #fafafa;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+/* Fill the dialog width (the page grid is centred at 90%). */
+.memberGrid { width: 100% !important; margin: 0 !important; }
+
+.memberLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+
 /* Profile modal (left-click) — a compact echo of the profile page. */
 .profileModalCard {
   position: relative;
@@ -524,6 +546,60 @@
 
 .roleOptActive { color: var(--color-base); background: var(--gradient-accent); border-color: transparent; }
 .roleOptActive:hover { background: var(--gradient-accent); opacity: 0.94; }
+
+/* Create / Select tabs in the add-member modal. */
+.addTabs {
+  display: flex;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.addTab {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-muted);
+  background: #f4f4f5;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.addTab:not(.addTabActive):hover { background: #ececed; color: var(--color-ink); }
+.addTabActive { color: var(--color-base); background: var(--color-ink); border-color: var(--color-ink); }
+
+/* Relationship-edge modal — list of parent links to remove. */
+.linkList { display: flex; flex-direction: column; gap: var(--space-2); }
+.linkRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-medium);
+  background: #f4f4f5;
+  border-radius: var(--radius-md);
+}
+
+/* Existing-person picker (Select tab). */
+.selectScroll { max-height: 240px; overflow-y: auto; }
+
+.pickerIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--color-muted);
+  background: #f0f0f1;
+  border-radius: var(--radius-pill);
+}
+
+.pickerIcon svg { width: 18px; height: 18px; }
 
 .checkboxRow { display: inline-flex; align-items: center; gap: var(--space-2); font-size: 0.9rem; }
 

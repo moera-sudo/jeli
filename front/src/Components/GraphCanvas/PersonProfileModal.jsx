@@ -9,6 +9,7 @@ import {
   LocationIcon,
   GlobeIcon,
   BookIcon,
+  CheckIcon,
 } from '../../UI/icons'
 import { formatPersonName } from '../../utils/fullName'
 import styles from './GraphCanvas.module.css'
@@ -50,11 +51,28 @@ function Row({ icon, label, value }) {
  * @param {object|null} props.detail   PersonDetail, or null while loading.
  * @param {boolean} props.loading
  * @param {() => void} props.onClose
+ * @param {boolean} props.isOwner           Viewer owns this graph (can delegate rights).
+ * @param {string}  props.currentUserId
+ * @param {boolean} props.isCollaborator    This member already has edit rights.
  * @param {() => void} props.onEdit
  * @param {() => void} props.onRemove
  * @param {() => void} props.onInvite
+ * @param {() => void} props.onGrantCollaborator
+ * @param {() => void} props.onRevokeCollaborator
  */
-export default function PersonProfileModal({ detail, loading, onClose, onEdit, onRemove, onInvite }) {
+export default function PersonProfileModal({
+  detail,
+  loading,
+  isOwner = false,
+  currentUserId,
+  isCollaborator = false,
+  onClose,
+  onEdit,
+  onRemove,
+  onInvite,
+  onGrantCollaborator,
+  onRevokeCollaborator,
+}) {
   const general = []
   const origin = []
   if (detail) {
@@ -130,6 +148,19 @@ export default function PersonProfileModal({ detail, loading, onClose, onEdit, o
                   </Button>
                 </div>
               </>
+            )}
+
+            {/* Owner delegating edit rights to a registered relative. */}
+            {isOwner && detail.linked_user_id && detail.linked_user_id !== currentUserId && (
+              isCollaborator ? (
+                <Button variant="primary" size="sm" fullWidth onClick={onRevokeCollaborator}>
+                  Отозвать права редактирования
+                </Button>
+              ) : (
+                <Button variant="accent" size="sm" fullWidth trailingIcon={<CheckIcon />} onClick={onGrantCollaborator}>
+                  Дать права редактирования
+                </Button>
+              )
             )}
           </div>
         )}

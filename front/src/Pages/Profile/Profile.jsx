@@ -3,28 +3,35 @@ import { useNavigate } from 'react-router-dom'
 
 import TopBar from '../../Components/TopBar/TopBar'
 import ProfileEditor from '../../Components/ProfileEditor/ProfileEditor'
+import ProfileView, { Card } from '../../Components/ProfileView/ProfileView'
 import Button from '../../UI/Button/Button'
 import Loader from '../../UI/Loader/Loader'
-import {
-  EditIcon,
-  MailIcon,
-  CalendarIcon,
-  LocationIcon,
-  GlobeIcon,
-  UsersIcon,
-  BookIcon,
-  UserIcon,
-} from '../../UI/icons'
-import { getMyProfile, updateProfile } from '../../api/profileService'
+import { EditIcon, MailIcon, CloseIcon } from '../../UI/icons'
+import { getMyProfile, updateProfile, deleteAccount } from '../../api/profileService'
+import { getSuccessorCandidates } from '../../api/graphService'
 import { useAuth } from '../../auth/AuthContext'
 import { ROUTES } from '../../Routes/Routes'
-import { formatDate, displayValue } from '../../utils/format'
 import { formatPersonName } from '../../utils/fullName'
 import styles from './Profile.module.css'
 
-const GENDER_LABELS = { male: 'Мужской', female: 'Женский' }
+/** Small centred dialog used by the account-deletion flow. */
+function DeleteModal({ title, onClose, children }) {
+  return (
+    <div className={styles.modalBackdrop} onPointerDown={onClose}>
+      <div className={styles.modalCard} role="dialog" aria-label={title} onPointerDown={(e) => e.stopPropagation()}>
+        <header className={styles.modalHead}>
+          <h3 className={styles.modalTitle}>{title}</h3>
+          <button type="button" className={styles.modalClose} aria-label="Закрыть" onClick={onClose}>
+            <CloseIcon />
+          </button>
+        </header>
+        {children}
+      </div>
+    </div>
+  )
+}
 
-/** A label → value row used across the info cards. */
+/** A label → value row for the account card. */
 function InfoRow({ icon, label, value }) {
   return (
     <div className={styles.row}>
@@ -35,27 +42,19 @@ function InfoRow({ icon, label, value }) {
   )
 }
 
-/** Card wrapper with a title. */
-function Card({ title, children, className }) {
-  return (
-    <section className={[styles.card, className].filter(Boolean).join(' ')}>
-      {title && (
-        <header className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>{title}</h2>
-        </header>
-      )}
-      {children}
-    </section>
-  )
-}
-
 export default function Profile() {
   const navigate = useNavigate()
   const { user, setUser, logout } = useAuth()
 
   const [editing, setEditing] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [deleteNotice, setDeleteNotice] = useState('')
+
+  // Account deletion: null → confirm dialog → (if sole owner) successor picker.
+  const [deleteStep, setDeleteStep] = useState(null) // null | 'confirm' | 'successor'
+  const [successors, setSuccessors] = useState([])
+  const [pickedSuccessor, setPickedSuccessor] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   // Always refresh from the server when opening the profile.
   useEffect(() => {
@@ -78,9 +77,37 @@ export default function Profile() {
     setEditing(false)
   }
 
-  const handleDelete = () => {
-    // No backend endpoint yet — surface an honest notice instead of failing.
-    setDeleteNotice('Удаление аккаунта пока недоступно.')
+  const openDelete = () => {
+    setDeleteError('')
+    setPickedSuccessor('')
+    setDeleteStep('confirm')
+  }
+
+  // Runs the deletion. If the server needs a successor (409), switch to the
+  // picker and retry with the chosen owner.
+  const runDelete = async (newOwnerUserId) => {
+    setDeleteError('')
+    setDeleting(true)
+    try {
+      await deleteAccount(newOwnerUserId)
+      logout()
+      navigate(ROUTES.login, { replace: true })
+    } catch (err) {
+      if (err.status === 409 && !newOwnerUserId) {
+        try {
+          const candidates = await getSuccessorCandidates()
+          if (candidates.length) {
+            setSuccessors(candidates)
+            setPickedSuccessor(candidates[0].id)
+            setDeleteStep('successor')
+            return
+          }
+        } catch { /* fall through to the generic error */ }
+      }
+      setDeleteError(err.message || 'Не удалось удалить аккаунт')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -99,51 +126,15 @@ export default function Profile() {
             onCancel={() => setEditing(false)}
           />
         ) : (
-          <div className={styles.grid}>
-            {/* ------------------------------------------------- profile column */}
-            <Card className={styles.identity}>
-              <div className={styles.avatarWrap}>
-                <img className={styles.avatar} src={user.avatar_url} alt="Аватар пользователя" />
-              </div>
-
-              <h1 className={styles.name}>{formatPersonName(user, '—')}</h1>
-
-              <div className={styles.identityActions}>
-                <Button variant="primary" size="sm" trailingIcon={<EditIcon />} onClick={() => setEditing(true)}>
-                  Редактировать профиль
-                </Button>
-              </div>
-            </Card>
-
-            {/* ---------------------------------------------------- info column */}
-            <div className={styles.info}>
-              <Card title="Общая информация">
-                <div className={styles.rows}>
-                  <InfoRow icon={<UserIcon />} label="Пол" value={displayValue(GENDER_LABELS[user.gender])} />
-                  <InfoRow icon={<CalendarIcon />} label="Дата рождения" value={formatDate(user.birth_date)} />
-                  <InfoRow
-                    icon={<LocationIcon />}
-                    label="Место рождения"
-                    value={displayValue([user.birth_city, user.birth_country].filter(Boolean).join(', '))}
-                  />
-                  <InfoRow icon={<LocationIcon />} label="Город" value={displayValue(user.current_city)} />
-                  <InfoRow icon={<GlobeIcon />} label="Страна" value={displayValue(user.current_country)} />
-                </div>
-              </Card>
-
-              <Card title="Происхождение">
-                <div className={styles.rows}>
-                  <InfoRow icon={<GlobeIcon />} label="Национальность" value={displayValue(user.nationality)} />
-                  <InfoRow icon={<UsersIcon />} label="Жүз" value={displayValue(user.zhuz)} />
-                  <InfoRow icon={<BookIcon />} label="Тайпа (племя)" value={displayValue(user.tribe)} />
-                  <InfoRow icon={<UserIcon />} label="Ру (род)" value={displayValue(user.ru)} />
-                </div>
-              </Card>
-
-              <Card title="О себе">
-                <p className={styles.about}>{displayValue(user.description, 'Пока ничего не рассказано.')}</p>
-              </Card>
-
+          <ProfileView
+            person={user}
+            avatarAlt="Аватар пользователя"
+            action={
+              <Button variant="primary" size="sm" trailingIcon={<EditIcon />} onClick={() => setEditing(true)}>
+                Редактировать профиль
+              </Button>
+            }
+            extraCards={
               <Card title="Аккаунт">
                 <div className={styles.rows}>
                   <InfoRow icon={<MailIcon />} label="E-mail" value={user.email} />
@@ -156,16 +147,61 @@ export default function Profile() {
                   >
                     Выйти
                   </Button>
-                  <Button variant="primary" size="sm" onClick={handleDelete}>
+                  <Button variant="primary" size="sm" onClick={openDelete}>
                     Удалить аккаунт
                   </Button>
                 </div>
-                {deleteNotice && <p className={styles.notice} role="alert">{deleteNotice}</p>}
               </Card>
-            </div>
-          </div>
+            }
+          />
         )}
       </main>
+
+      {deleteStep === 'confirm' && (
+        <DeleteModal title="Удалить аккаунт" onClose={() => setDeleteStep(null)}>
+          <p className={styles.modalText}>
+            Аккаунт и профиль будут удалены безвозвратно. Ваш узел в чужом дереве просто отвяжется, данные в нём сохранятся.
+          </p>
+          {deleteError && <p className={styles.notice} role="alert">{deleteError}</p>}
+          <div className={styles.modalActions}>
+            <Button variant="primary" size="sm" onClick={() => setDeleteStep(null)}>Отмена</Button>
+            <Button variant="accent" size="sm" disabled={deleting} onClick={() => runDelete()}>
+              {deleting ? 'Удаление…' : 'Удалить'}
+            </Button>
+          </div>
+        </DeleteModal>
+      )}
+
+      {deleteStep === 'successor' && (
+        <DeleteModal title="Кому передать дерево" onClose={() => setDeleteStep(null)}>
+          <p className={styles.modalText}>
+            Вы — единственный владелец дерева, в котором есть другие участники. Выберите, кто станет его владельцем.
+          </p>
+          <ul className={styles.pickerList}>
+            {successors.map((c) => (
+              <li key={c.id}>
+                <label className={styles.pickerItem}>
+                  <input
+                    type="radio"
+                    name="successor"
+                    checked={pickedSuccessor === c.id}
+                    onChange={() => setPickedSuccessor(c.id)}
+                  />
+                  {c.avatar_url && <img src={c.avatar_url} alt="" className={styles.pickerAvatar} />}
+                  <span>{formatPersonName(c, 'Без имени')}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {deleteError && <p className={styles.notice} role="alert">{deleteError}</p>}
+          <div className={styles.modalActions}>
+            <Button variant="primary" size="sm" onClick={() => setDeleteStep(null)}>Отмена</Button>
+            <Button variant="accent" size="sm" disabled={deleting || !pickedSuccessor} onClick={() => runDelete(pickedSuccessor)}>
+              {deleting ? 'Удаление…' : 'Передать и удалить'}
+            </Button>
+          </div>
+        </DeleteModal>
+      )}
     </div>
   )
 }

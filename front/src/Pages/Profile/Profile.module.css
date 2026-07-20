@@ -268,6 +268,43 @@
   color: var(--color-muted);
 }
 
+/* ------------------------------------------------------ delete-account modal */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.modalCard {
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--space-5);
+  background: var(--color-base);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.modalHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4); }
+.modalTitle { font-size: 1.1rem; font-weight: var(--font-weight-bold); }
+.modalClose { display: inline-flex; padding: 4px; color: var(--color-muted); border-radius: var(--radius-pill); }
+.modalClose:hover { background: #f4f4f5; }
+.modalClose svg { width: 18px; height: 18px; }
+
+.modalText { font-size: 0.9rem; line-height: 1.5; color: var(--color-muted); }
+.modalActions { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-4); }
+
+.pickerList { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-4) 0; }
+.pickerItem { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2); border-radius: var(--radius-md); cursor: pointer; }
+.pickerItem:hover { background: #f4f4f5; }
+.pickerAvatar { width: 32px; height: 32px; border-radius: var(--radius-pill); object-fit: cover; }
+
 .loadError {
   max-width: 1080px;
   margin: 0 auto var(--space-4);

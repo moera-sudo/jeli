@@ -25,6 +25,22 @@ export async function register(payload) {
 }
 
 /**
+ * Register a new account and fill the full profile in one request (alternative
+ * to `register` + `profileService.createProfile`).
+ *
+ * @param {object} payload  Required: email, password, last_name, first_name.
+ *   Optional: patronymic, graph_invite_code, and any profile field
+ *   (gender, current_city/country, birth_date, birth_city/country, description,
+ *   nationality, ru/zhuz/tribe, avatar_url).
+ * @returns {Promise<object>} The created user (UserMe).
+ */
+export async function registerWithInfo(payload) {
+  const { data } = await api.post('/auth/register/with-info', payload);
+  tokenStorage.set(data.access_token, data.refresh_token);
+  return data.user;
+}
+
+/**
  * Log in with email + password.
  *
  * @param {object} payload

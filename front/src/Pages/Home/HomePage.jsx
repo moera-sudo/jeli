@@ -76,7 +76,7 @@ export default function HomePage() {
       />
       <main className={styles.workspace}>
         <div className={styles.graphWrap}>
-          <GraphCanvas focusPerson={me} onGraphChanged={reloadMe} />
+          <GraphCanvas focusPerson={me} isOwner={isAdmin} currentUserId={user?.id} onGraphChanged={reloadMe} />
         </div>
         <HistoryPanel open={historyOpen} onClose={() => setHistoryOpen(false)} />
       </main>

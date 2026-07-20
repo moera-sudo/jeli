@@ -1,62 +1,66 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
-import { CloseIcon, UsersIcon, CheckIcon, BellIcon } from '../../UI/icons'
-import { getMarriageProposals } from '../../api/graphService'
-import { useAuth } from '../../auth/AuthContext'
+import { CloseIcon, UsersIcon, BellIcon } from '../../UI/icons'
+import { listNotifications, markAllNotificationsRead } from '../../api/notificationsService'
 import styles from './NotificationsPanel.module.css'
 
 /**
- * Notifications modal — a tall panel that slides in from the right edge.
- *
- * There is no dedicated notifications backend yet, so items are derived
- * best-effort from the user's marriage/merge proposals (`GET /marriage-proposals`):
- * the outcome of a request the user sent, and any new incoming request. The
- * list is fetched when the panel opens and tolerates an empty result.
+ * Notifications panel — a tall panel that slides in from the right edge.
+ * Backed by the real `/notifications` feature (match found / score changed /
+ * node unlinked). Fetched when the panel opens; "mark all read" clears them.
  */
 
-/** Turns a proposal into a notification descriptor, relative to the viewer. */
-function toNotification(proposal, userId) {
-  const outgoing = proposal.proposer_user_id === userId
-  if (proposal.status === 'confirmed') {
-    return {
-      tone: 'invite',
-      icon: <CheckIcon />,
-      title: outgoing ? 'Запрос на связь принят' : 'Связь семей подтверждена',
-      text: 'Деревья двух семей теперь видны друг другу.',
-    }
+const TIME_FMT = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'long',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+/** Turns a NotificationRead into a display descriptor. */
+function describe(n) {
+  const p = n.payload || {}
+  const pct = p.score != null ? ` — совпадение ${Math.round(p.score * 100)}%` : ''
+  switch (n.type) {
+    case 'new_match':
+      return { tone: 'match', icon: <UsersIcon />, title: 'Новое совпадение', text: `Найден возможный родственник${pct}.` }
+    case 'match_score_changed':
+      return { tone: 'match', icon: <UsersIcon />, title: 'Совпадение обновлено', text: `Оценка возможного родства изменилась${pct}.` }
+    case 'excluded_from_graph':
+      return { tone: 'system', icon: <BellIcon />, title: 'Узел отвязан', text: `«${p.person_display_name || 'Ваш узел'}» больше не связан с вашим аккаунтом.` }
+    default:
+      return { tone: 'system', icon: <BellIcon />, title: 'Уведомление', text: '' }
   }
-  if (proposal.status === 'rejected' && outgoing) {
-    return { tone: 'system', icon: <BellIcon />, title: 'Запрос на связь отклонён', text: 'Другая семья отклонила ваш запрос.' }
-  }
-  if (proposal.status === 'pending') {
-    return outgoing
-      ? { tone: 'system', icon: <UsersIcon />, title: 'Запрос отправлен', text: 'Ожидает подтверждения другой семьи.' }
-      : { tone: 'match', icon: <UsersIcon />, title: 'Новый запрос на связь семей', text: 'Подтвердите его во вкладке «Запросы».' }
-  }
-  return null
+}
+
+function formatTime(iso) {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : TIME_FMT.format(d)
 }
 
 export default function NotificationsPanel({ open, onClose }) {
-  const { user } = useAuth()
   const [items, setItems] = useState([])
 
-  useEffect(() => {
-    if (!open || !user) return
-    let active = true
-    getMarriageProposals()
-      .then((proposals) => {
-        if (!active) return
-        setItems(
-          proposals
-            .map((p) => ({ id: p.id, ...toNotification(p, user.id) }))
-            .filter((n) => n.title),
-        )
-      })
-      .catch(() => active && setItems([]))
-    return () => {
-      active = false
+  const load = useCallback(async () => {
+    try {
+      setItems(await listNotifications())
+    } catch {
+      setItems([])
     }
-  }, [open, user])
+  }, [])
+
+  useEffect(() => {
+    if (open) load()
+  }, [open, load])
+
+  const hasUnread = items.some((n) => !n.is_read)
+
+  const markAll = async () => {
+    try {
+      await markAllNotificationsRead()
+      await load()
+    } catch { /* keep the list as-is on failure */ }
+  }
 
   return (
     <>
@@ -74,26 +78,37 @@ export default function NotificationsPanel({ open, onClose }) {
       >
         <header className={styles.head}>
           <h2 className={styles.title}>Уведомления</h2>
-          <button type="button" className={styles.close} aria-label="Закрыть" onClick={onClose}>
-            <CloseIcon />
-          </button>
+          <div className={styles.headActions}>
+            {hasUnread && (
+              <button type="button" className={styles.markAll} onClick={markAll}>
+                Прочитать все
+              </button>
+            )}
+            <button type="button" className={styles.close} aria-label="Закрыть" onClick={onClose}>
+              <CloseIcon />
+            </button>
+          </div>
         </header>
 
         {items.length === 0 ? (
           <p className={styles.empty}>Пока нет уведомлений.</p>
         ) : (
           <ul className={styles.list}>
-            {items.map((n) => (
-              <li key={n.id} className={styles.item}>
-                <span className={`${styles.itemIcon} ${styles[n.tone]}`} aria-hidden="true">
-                  {n.icon}
-                </span>
-                <div className={styles.itemBody}>
-                  <p className={styles.itemTitle}>{n.title}</p>
-                  <p className={styles.itemText}>{n.text}</p>
-                </div>
-              </li>
-            ))}
+            {items.map((n) => {
+              const d = describe(n)
+              return (
+                <li key={n.id} className={`${styles.item} ${n.is_read ? '' : styles.unread}`}>
+                  <span className={`${styles.itemIcon} ${styles[d.tone]}`} aria-hidden="true">
+                    {d.icon}
+                  </span>
+                  <div className={styles.itemBody}>
+                    <p className={styles.itemTitle}>{d.title}</p>
+                    {d.text && <p className={styles.itemText}>{d.text}</p>}
+                    <span className={styles.itemTime}>{formatTime(n.created_at)}</span>
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         )}
       </aside>

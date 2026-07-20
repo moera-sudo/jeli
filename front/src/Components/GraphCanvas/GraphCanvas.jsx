@@ -5,23 +5,33 @@ import { ReactFlow, Background, Panel, ReactFlowProvider, useReactFlow, useViewp
 import PersonNode from './PersonNode'
 import UnionNode from './UnionNode'
 import PersonProfileModal from './PersonProfileModal'
+import MemberProfileModal from './MemberProfileModal'
 import PersonFormModal from './PersonFormModal'
 import AddMemberModal from './AddMemberModal'
+import MarriageModal from './MarriageModal'
+import RelationshipEdgeModal from './RelationshipEdgeModal'
 import Button from '../../UI/Button/Button'
 import Loader from '../../UI/Loader/Loader'
-import { UsersIcon, DownloadIcon, CloseIcon, CheckIcon, PlusIcon, MinusIcon } from '../../UI/icons'
+import { DownloadIcon, CloseIcon, CheckIcon, PlusIcon, MinusIcon } from '../../UI/icons'
 import { downloadSvgAsImage } from '../../utils/exportImage'
 import { buildFlow, NODE_SIZE, UNION_SIZE } from '../../utils/buildFlow'
 import { formatPersonName } from '../../utils/fullName'
-import { ROUTES } from '../../Routes/Routes'
+import { ROUTES, chatPath } from '../../Routes/Routes'
 import {
-  getGraph,
+  getHouseholdGraph,
   getPerson,
   createPerson,
+  createRelationship,
+  updateRelationship,
+  deleteRelationship,
+  insertPersonBetween,
   updatePerson,
   deletePerson,
   generateInviteCode,
   getSuccessorCandidates,
+  listCollaborators,
+  grantCollaborator,
+  revokeCollaborator,
 } from '../../api/graphService'
 import styles from './GraphCanvas.module.css'
 
@@ -217,7 +227,7 @@ function GraphControls({ canvasRef, onExport, exporting }) {
 }
 
 /* ======================================================== component ===== */
-function GraphCanvasInner({ focusPerson, onGraphChanged }) {
+function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraphChanged }) {
   const focusId = focusPerson.id
   const navigate = useNavigate()
   const { setCenter } = useReactFlow()
@@ -226,7 +236,9 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
   const [graph, setGraph] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [depth, setDepth] = useState(3)
+
+  // User ids the owner has delegated edit rights to (owner view only).
+  const [collaboratorIds, setCollaboratorIds] = useState([])
 
   const [selectedId, setSelectedId] = useState(null)
   const [detail, setDetail] = useState(null)
@@ -243,18 +255,20 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
   }, [])
 
   /* ------------------------------------------------------------ data --- */
+  // Full household graph (unbounded) so no relative is ever cut off by a depth
+  // horizon — siblings, nephews and in-laws all load.
   const loadGraph = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const data = await getGraph(focusId, depth)
+      const data = await getHouseholdGraph(focusId)
       setGraph(data)
     } catch (err) {
       setError(err.message || 'Не удалось загрузить дерево')
     } finally {
       setLoading(false)
     }
-  }, [focusId, depth])
+  }, [focusId])
 
   useEffect(() => {
     loadGraph()
@@ -271,6 +285,19 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
     }
   }, [flash])
 
+  // Only the graph owner can delegate edit rights, so only they load the list.
+  const loadCollaborators = useCallback(async () => {
+    if (!isOwner) return
+    try {
+      const list = await listCollaborators()
+      setCollaboratorIds(list.map((c) => c.collaborator_user_id))
+    } catch { /* non-critical: grant/revoke still surface their own errors */ }
+  }, [isOwner])
+
+  useEffect(() => {
+    loadCollaborators()
+  }, [loadCollaborators])
+
   const { nodes, edges } = useMemo(() => {
     if (!graph) return { nodes: [], edges: [] }
     const flow = buildFlow(graph)
@@ -279,10 +306,11 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
     return flow
   }, [graph, selectedId])
 
-  const hasMore = useMemo(
-    () => (graph?.persons ?? []).some((p) => p.has_more_ancestors),
-    [graph],
-  )
+  const nameById = useMemo(() => {
+    const m = new Map()
+    for (const p of graph?.persons ?? []) m.set(p.id, formatPersonName(p, 'Без имени'))
+    return m
+  }, [graph])
 
   // Open the tree at 100% zoom centred on the current user. Runs once per graph
   // (re)load — keyed on the graph object, so selecting a card doesn't recentre.
@@ -304,7 +332,11 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
   // anyone else opens their full-profile modal over the card. Union junctions
   // aren't people — ignore them.
   const handleNodeClick = useCallback((_, node) => {
-    if (node.type === 'union') return
+    if (node.type === 'union') {
+      // The owner can edit/remove a real marriage from its junction.
+      if (isOwner && node.data?.spouseRelId) setModal({ kind: 'marriage', relId: node.data.spouseRelId })
+      return
+    }
     if (node.id === focusId) {
       navigate(ROUTES.profile)
       return
@@ -313,14 +345,24 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
     setDetail(null)
     loadDetail(node.id)
     setModal({ kind: 'profile' })
-  }, [loadDetail, focusId, navigate])
+  }, [loadDetail, focusId, navigate, isOwner])
 
-  // Right-click suppresses the browser menu and opens the add-relative modal.
+  // Owner-only: clicking a descent line manages that parent link (insert a
+  // generation between, or remove a mistaken link).
+  const handleEdgeClick = useCallback((_, edge) => {
+    if (!isOwner || edge.data?.kind !== 'descent') return
+    const links = (edge.data.links ?? []).map((l) => ({ ...l, parentName: nameById.get(l.parentId) ?? 'родитель' }))
+    if (!links.length) return
+    setModal({ kind: 'edge', childId: edge.data.childId, childName: nameById.get(edge.data.childId) ?? 'ребёнок', links })
+  }, [isOwner, nameById])
+
+  // Right-click suppresses the browser menu and, for the graph owner only,
+  // opens the add-relative modal. Regular members never see the add window.
   const handleNodeContextMenu = useCallback((event, node) => {
     event.preventDefault()
-    if (node.type === 'union') return
+    if (node.type === 'union' || !isOwner) return
     setModal({ kind: 'add', targetId: node.id, targetPerson: node.data.person })
-  }, [])
+  }, [isOwner])
 
   const clearSelection = useCallback(() => {
     setSelectedId(null)
@@ -391,7 +433,10 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
     sibling: 'Сначала добавьте брата или сестру — эта роль привязывается к ним',
   }
 
-  const submitAdd = async ({ role, values }) => {
+  // Add a relative in one of two modes: create a fresh card, or link an
+  // existing person from the tree into the chosen role (so, e.g., a sibling can
+  // reuse the same parents instead of spawning a duplicate).
+  const submitAdd = async ({ mode, role, values, personId }) => {
     const cfg = ROLE_MAP[role]
     if (!cfg) throw new Error('Выберите, кем приходится новый родственник')
 
@@ -407,12 +452,26 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
     }[cfg.anchor]
 
     if (!anchorIds?.length) throw new Error(ANCHOR_ERROR[cfg.anchor] ?? 'Не удалось определить связь')
+    const anchorId = anchorIds[0]
+
+    if (mode === 'select') {
+      if (cfg.relation === 'spouse') {
+        throw new Error('Супруга нельзя выбрать из существующих — создайте карточку или свяжите семьи по коду')
+      }
+      // The only linkable relation is child_of (from = child, to = parent);
+      // a "parent" role means the picked person is the parent of the anchor.
+      const from_person_id = cfg.relation === 'parent' ? anchorId : personId
+      const to_person_id = cfg.relation === 'parent' ? personId : anchorId
+      await createRelationship({ from_person_id, to_person_id })
+      await afterMutation('Родственник связан')
+      return
+    }
 
     const gender =
       cfg.relation === 'spouse' && cfg.gender == null
         ? targetGender === 'male' ? 'female' : 'male'
         : cfg.gender
-    const relation = { to_person_id: anchorIds[0], type: cfg.relation }
+    const relation = { to_person_id: anchorId, type: cfg.relation }
 
     await createPerson({ ...values, gender, relation })
     await afterMutation('Родственник добавлен')
@@ -421,6 +480,24 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
   const submitEdit = async (values) => {
     await updatePerson(detail.id, values)
     await afterMutation('Изменения сохранены')
+  }
+
+  /* ------------------------------------------------- marriage / edge ops --- */
+  const submitMarriageSave = async (values) => {
+    await updateRelationship(modal.relId, values)
+    await afterMutation('Брак обновлён')
+  }
+  const submitMarriageDelete = async () => {
+    await deleteRelationship(modal.relId)
+    await afterMutation('Связь удалена')
+  }
+  const submitInsertBetween = async ({ values, parentId }) => {
+    await insertPersonBetween({ ...values, parent_id: parentId, child_id: modal.childId })
+    await afterMutation('Поколение добавлено')
+  }
+  const submitDeleteLink = async (relId) => {
+    await deleteRelationship(relId)
+    await afterMutation('Связь удалена')
   }
 
   const handleRemove = () => setModal({ kind: 'confirmRemove' })
@@ -462,6 +539,36 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
     }
   }
 
+  // Open the chat with a registered relative — their thread if one exists,
+  // otherwise the chats list.
+  const handleOpenChat = () => {
+    navigate(detail?.chat_thread_id ? chatPath(detail.chat_thread_id) : ROUTES.chats)
+  }
+
+  // Owner delegates (or revokes) edit rights so a registered relative can also
+  // build the tree — the sanctioned way around the owner-only edit restriction.
+  const handleGrantCollaborator = async () => {
+    try {
+      await grantCollaborator(detail.id)
+      await loadCollaborators()
+      await loadDetail(detail.id)
+      flash('Права редактирования выданы')
+    } catch (err) {
+      flash(err.message || 'Не удалось выдать права')
+    }
+  }
+
+  const handleRevokeCollaborator = async () => {
+    try {
+      await revokeCollaborator(detail.linked_user_id)
+      await loadCollaborators()
+      await loadDetail(detail.id)
+      flash('Права редактирования отозваны')
+    } catch (err) {
+      flash(err.message || 'Не удалось отозвать права')
+    }
+  }
+
   /* ---------------------------------------------------------- export --- */
   const [exporting, setExporting] = useState(false)
   const handleExport = useCallback(async (format) => {
@@ -498,6 +605,7 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
         nodeTypes={nodeTypes}
         onNodeClick={handleNodeClick}
         onNodeContextMenu={handleNodeContextMenu}
+        onEdgeClick={handleEdgeClick}
         onPaneClick={clearSelection}
         nodesDraggable={false}
         nodesConnectable={false}
@@ -512,18 +620,6 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
 
         <GraphControls canvasRef={canvasRef} onExport={handleExport} exporting={exporting} />
 
-        {hasMore && (
-          <Panel position="top-left" className={styles.toolbar}>
-            <button
-              type="button"
-              className={styles.toolbarBtn}
-              onClick={() => setDepth((d) => Math.min(8, d + 2))}
-            >
-              <UsersIcon /> Показать ещё поколение
-            </button>
-          </Panel>
-        )}
-
         <Panel position="bottom-right" className={styles.legend}>
           <span className={styles.legendItem}><span className={`${styles.dot} ${styles.status_registered}`} /> В приложении</span>
           <span className={styles.legendItem}><span className={`${styles.dot} ${styles.status_unregistered}`} /> Не в приложении</span>
@@ -532,23 +628,58 @@ function GraphCanvasInner({ focusPerson, onGraphChanged }) {
       </ReactFlow>
 
       {/* --------------------------------------------------------- modals */}
-      {/* Left-click: full profile over the card. */}
+      {/* Left-click: registered relatives get their full profile with a chat
+          button; unregistered records get the editable card. */}
       {modal?.kind === 'profile' && (
-        <PersonProfileModal
-          detail={detail}
-          loading={detailLoading}
-          onClose={() => { closeModal(); clearSelection() }}
-          onEdit={() => setModal({ kind: 'edit' })}
-          onRemove={handleRemove}
-          onInvite={handleInvite}
-        />
+        detail?.linked_user_id ? (
+          <MemberProfileModal
+            userId={detail.linked_user_id}
+            onOpenChat={handleOpenChat}
+            onClose={() => { closeModal(); clearSelection() }}
+          />
+        ) : (
+          <PersonProfileModal
+            detail={detail}
+            loading={detailLoading}
+            isOwner={isOwner}
+            currentUserId={currentUserId}
+            isCollaborator={!!detail?.linked_user_id && collaboratorIds.includes(detail.linked_user_id)}
+            onClose={() => { closeModal(); clearSelection() }}
+            onEdit={() => setModal({ kind: 'edit' })}
+            onRemove={handleRemove}
+            onInvite={handleInvite}
+            onGrantCollaborator={handleGrantCollaborator}
+            onRevokeCollaborator={handleRevokeCollaborator}
+          />
+        )
       )}
 
-      {/* Right-click: add a new family member with a role selector. */}
+      {/* Right-click: add a new family member (create) or link an existing one. */}
       {modal?.kind === 'add' && (
         <AddMemberModal
           targetName={formatPersonName(modal.targetPerson, 'родственнику')}
+          people={(graph?.persons ?? []).filter((p) => p.id !== modal.targetId)}
           onSubmit={submitAdd}
+          onClose={closeModal}
+        />
+      )}
+
+      {/* Click a marriage junction (owner): edit or remove the marriage. */}
+      {modal?.kind === 'marriage' && (
+        <MarriageModal
+          onSave={submitMarriageSave}
+          onDelete={submitMarriageDelete}
+          onClose={closeModal}
+        />
+      )}
+
+      {/* Click a descent line (owner): insert a generation between, or unlink. */}
+      {modal?.kind === 'edge' && (
+        <RelationshipEdgeModal
+          childName={modal.childName}
+          links={modal.links}
+          onInsert={submitInsertBetween}
+          onDeleteLink={submitDeleteLink}
           onClose={closeModal}
         />
       )}
