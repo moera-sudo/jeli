@@ -1,7 +1,7 @@
 info:
   name: health
   type: http
-  seq: 2
+  seq: 7
 
 http:
   method: GET
@@ -9,16 +9,16 @@ http:
   auth: inherit
 
 runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("service reports ok", function () {
+          expect(res.body.status).to.equal("ok");
+        });
   assertions:
     - expression: res.status
       operator: eq
       value: "200"
-  scripts:
-    - type: tests
-      code: |
-        test("service reports ok", function () {
-          expect(res.body.status).to.equal("ok");
-        });
 
 settings:
   encodeUrl: true

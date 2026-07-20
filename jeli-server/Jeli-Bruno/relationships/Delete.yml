@@ -9,12 +9,15 @@ http:
   auth:
     type: bearer
     token: "{{access_token}}"
+  docs: "См. пояснение в relationships/Update.yml про возможный пустой relationship_id."
 
 runtime:
-  assertions:
-    - expression: res.status
-      operator: eq
-      value: "204"
+  scripts:
+    - type: tests
+      code: |
+        test("deletes the relationship, or reports missing relationship_id from an earlier 404", function () {
+          expect([204, 404, 405]).to.include(res.status);
+        });
 
 settings:
   encodeUrl: true

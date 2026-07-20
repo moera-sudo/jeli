@@ -1,0 +1,38 @@
+info:
+  name: 4 Edit Profile User2
+  type: http
+  seq: 4
+
+http:
+  method: PATCH
+  url: "{{base_url}}/users/profile/edit"
+  body:
+    type: json
+    data: |-
+      {
+        "gender": "female",
+        "birth_country": "KZ",
+        "current_country": "KZ",
+        "current_city": "Almaty"
+      }
+  auth:
+    type: bearer
+    token: "{{access_token_2}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("fills gender required for graph/create", function () {
+          expect(res.body.gender).to.equal("female");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

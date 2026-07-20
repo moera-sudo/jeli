@@ -11,32 +11,30 @@ http:
     data: |-
       {
         "person_a_id": "{{person_id}}",
-        "target_invite_code": "{{invite_code}}",
+        "target_invite_code": "{{invite_code_4}}",
         "marriage_year": 2015
       }
   auth:
     type: bearer
     token: "{{access_token}}"
   docs: >-
-    {{invite_code}} захватывается из persons/Invite Code.yml — это код СВОЕГО ЖЕ узла ({{person_id}}),
-    поэтому в линейном прогоне одним аккаунтом это по сути self-marriage → 409 SelfRelationshipError
-    ("A person cannot be related to themselves"). Для реального 200/pending нужен invite-код узла
-    ВТОРОГО зарегистрированного аккаунта — та же принципиальная граница, что и у
-    graph/collaborators/Grant (второй аккаунт не воспроизводится в линейной цепочке одной сессии).
+    invite_code_4 — реальный код узла user4 (заполняется scenario/16-19, отдельная переменная от
+    {{invite_code}}, который используется persons/Invite Code.yml/graph/Join для СВОЕГО ЖЕ узла —
+    раньше обе цели ошибочно делили одну переменную, из-за чего этот запрос всегда бил себя же
+    в 409 SelfRelationshipError). Прогоните scenario/ целиком для реального pending/confirmed.
 
 runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
   scripts:
     - type: tests
       code: |
-        test("creates the proposal, or reports invalid code / self-target / a duplicate", function () {
-          expect([200, 404, 409]).to.include(res.status);
+        test("creates a pending marriage proposal with user4's node", function () {
+          expect(res.body.id).to.be.a("string");
+          expect(res.body.status).to.equal("pending");
         });
-        if (res.status === 200) {
-          test("proposal is pending or auto-confirmed", function () {
-            expect(res.body.id).to.be.a("string");
-            expect(["pending", "confirmed"]).to.include(res.body.status);
-          });
-        }
     - type: after-response
       code: |
         if (res.status === 200) {

@@ -1,0 +1,48 @@
+info:
+  name: 3 Register User2
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/auth/register"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "scenario.user2@example.com",
+        "password": "string123",
+        "last_name": "Aitbayeva",
+        "first_name": "Saltanat",
+        "patronymic": null,
+        "graph_invite_code": ""
+      }
+  auth: inherit
+  docs: >-
+    Второй независимый аккаунт — для проверки реального мэтчинга между двумя деревьями,
+    брака между графами и делегирования коллаборатора. См. остальные файлы папки scenario/.
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("registers a second independent account", function () {
+          expect(res.body.user.id).to.be.a("string");
+        });
+    - type: after-response
+      code: |
+        if (res.status === 200) {
+          bru.setVar("access_token_2", res.body.access_token);
+          bru.setVar("refresh_token_2", res.body.refresh_token);
+          bru.setVar("user_id_2", res.body.user.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

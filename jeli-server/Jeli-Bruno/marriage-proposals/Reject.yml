@@ -8,16 +8,17 @@ http:
   url: "{{base_url}}/marriage-proposals/{{proposal_id}}/reject"
   auth:
     type: bearer
-    token: "{{access_token}}"
+    token: "{{access_token_4}}"
   docs: >-
-    Отклонить может только владелец второй стороны (не person_a) — см. пояснение в Confirm.yml.
+    Прогоняется ПОСЛЕ Confirm.yml на той же proposal_id — ожидаем 409 ProposalAlreadyResolvedError
+    (нельзя отклонить уже подтверждённый брак), это осознанный тест на этот путь, не баг.
 
 runtime:
   scripts:
     - type: tests
       code: |
-        test("rejects, or reports permission/already-resolved", function () {
-          expect([200, 403, 409]).to.include(res.status);
+        test("rejects, or reports it's already resolved", function () {
+          expect([200, 409]).to.include(res.status);
         });
 
 settings:

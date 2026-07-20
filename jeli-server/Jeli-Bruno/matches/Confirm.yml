@@ -10,15 +10,16 @@ http:
     type: bearer
     token: "{{access_token}}"
   docs: >-
-    {{match_id}} захватывается из persons/Matches.yml (первый найденный кандидат). Если алгоритм
-    мэтчинга не нашёл ни одного кандидата к моменту прогона, ожидаем 404.
+    {{match_id}} к этому моменту — уже реальный, дважды подтверждённый матч из scenario/09-11
+    (persons/Matches.yml на generic person_id обычно ничего не находит и не перезаписывает
+    переменную). Поэтому здесь ожидаем 409 — матч уже полностью резолвлен.
 
 runtime:
   scripts:
     - type: tests
       code: |
-        test("confirms the match, or reports it doesn't exist yet", function () {
-          expect([200, 404]).to.include(res.status);
+        test("confirms, or reports it's already resolved / doesn't exist", function () {
+          expect([200, 404, 409]).to.include(res.status);
         });
 
 settings:

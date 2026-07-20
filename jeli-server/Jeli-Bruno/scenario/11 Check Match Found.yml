@@ -1,0 +1,45 @@
+info:
+  name: 11 Check Match Found
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{base_url}}/persons/{{shared_ancestor_a}}/matches"
+  auth:
+    type: bearer
+    token: "{{access_token}}"
+  docs: >-
+    Пересчёт мэтчей идёт в BackgroundTasks ПОСЛЕ ответа на 08 — небольшая задержка перед этим
+    запросом (before-request скрипт) даёт фоновой задаче время отработать.
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: before-request
+      code: |
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+    - type: tests
+      code: |
+        test("matching algorithm found the cross-tree ancestor pair", function () {
+          expect(res.body).to.be.an("array").that.is.not.empty;
+        });
+        if (res.body.length > 0) {
+          test("evidence has a chain with at least one generation", function () {
+            expect(res.body[0].evidence.chain_length).to.be.at.least(1);
+          });
+        }
+    - type: after-response
+      code: |
+        if (res.status === 200 && Array.isArray(res.body) && res.body.length > 0) {
+          bru.setVar("match_id", res.body[0].id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

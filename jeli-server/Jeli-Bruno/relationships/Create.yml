@@ -19,14 +19,16 @@ http:
     token: "{{access_token}}"
   docs: >-
     person_id/target_person_id могут уже быть напрямую связаны (persons/Create.yml создаёт их как
-    parent/child) — в этом случае ожидаем 409 DuplicateRelationshipError, а не 200.
+    parent/child) — тогда 409 DuplicateRelationshipError. persons/Delete.yml (раньше в этой же
+    последовательности) удаляет тот узел, на который на тот момент указывает target_person_id —
+    если это оказался тот же самый target_person_id, здесь получим 404.
 
 runtime:
   scripts:
     - type: tests
       code: |
-        test("either creates the edge (200) or reports a duplicate (409)", function () {
-          expect([200, 409]).to.include(res.status);
+        test("creates the edge, reports a duplicate, or the node was deleted earlier in the run", function () {
+          expect([200, 404, 409]).to.include(res.status);
         });
         if (res.status === 200) {
           test("created edge has the right type", function () {

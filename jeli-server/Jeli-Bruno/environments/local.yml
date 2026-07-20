@@ -1,0 +1,61 @@
+name: local
+variables:
+  - name: base_url
+    value: http://localhost:8000/api
+  - name: access_token
+    value: ""
+  - name: refresh_token
+    value: ""
+  - name: user_id
+    value: ""
+  - name: person_id
+    value: ""
+  - name: target_person_id
+    value: ""
+  - name: relationship_id
+    value: ""
+  - name: proposal_id
+    value: ""
+  - name: match_id
+    value: ""
+  - name: invite_code
+    value: ""
+  - name: collaborator_user_id
+    description: >-
+      ID пользователя-коллаборатора — теперь заполняется автоматически сценарием
+      scenario/11 Register User3.yml (см. папку scenario/ — полный многоаккаунтный прогон).
+    value: ""
+  - name: collaborator_person_id
+    description: "Узел user1, к которому присоединяется user3 (scenario/09-10)."
+    value: ""
+  - name: access_token_2
+    value: ""
+  - name: refresh_token_2
+    value: ""
+  - name: user_id_2
+    value: ""
+  - name: person_id_2
+    value: ""
+  - name: shared_ancestor_a
+    description: "Общий предок (1 поколение) со стороны user1 — scenario/04."
+    value: ""
+  - name: shared_ancestor_b
+    description: "Общий предок (1 поколение) со стороны user2 — scenario/05."
+    value: ""
+  - name: shared_grandancestor_a
+    value: ""
+  - name: shared_grandancestor_b
+    value: ""
+  - name: access_token_3
+    value: ""
+  - name: user_id_3
+    value: ""
+  - name: access_token_4
+    value: ""
+  - name: user_id_4
+    value: ""
+  - name: person_id_4
+    value: ""
+  - name: invite_code_4
+    description: "Инвайт-код узла user4 — таргет для marriage-proposals/Create.yml (scenario/16)."
+    value: ""

@@ -1,0 +1,36 @@
+info:
+  name: 17 Join As User3
+  type: http
+  seq: 17
+
+http:
+  method: POST
+  url: "{{base_url}}/graph/join"
+  body:
+    type: json
+    data: |-
+      {
+        "invite_code": "{{invite_code}}"
+      }
+  auth:
+    type: bearer
+    token: "{{access_token_3}}"
+  docs: "Присоединяет user3 к collaborator_person_id — теперь у узла есть linked_user_id, можно делегировать права."
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |
+        test("links user3 to the collaborator node", function () {
+          expect(res.body.linked_user_id).to.equal(bru.getVar("user_id_3"));
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

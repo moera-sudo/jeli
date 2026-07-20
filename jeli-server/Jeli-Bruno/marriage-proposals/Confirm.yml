@@ -8,18 +8,22 @@ http:
   url: "{{base_url}}/marriage-proposals/{{proposal_id}}/confirm"
   auth:
     type: bearer
-    token: "{{access_token}}"
+    token: "{{access_token_4}}"
   docs: >-
-    Подтвердить может только владелец второй стороны (не person_a) — при линейном прогоне одним
-    аккаунтом ожидаем 403 NotProposalResponderError, если target_invite_code вёл к чужому владельцу,
-    либо 409, если уже подтверждено/отклонено.
+    Подтверждает владелец ВТОРОЙ стороны — user4 (access_token_4, заполняется scenario/16-19).
+    Прогонять после marriage-proposals/Create.yml, реально создавшего pending на invite_code_4.
 
 runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
   scripts:
     - type: tests
       code: |
-        test("confirms, or reports permission/already-resolved", function () {
-          expect([200, 403, 409]).to.include(res.status);
+        test("confirms the marriage from user4's side", function () {
+          expect(res.body.status).to.equal("confirmed");
+          expect(res.body.resulting_relationship_id).to.be.a("string");
         });
 
 settings:

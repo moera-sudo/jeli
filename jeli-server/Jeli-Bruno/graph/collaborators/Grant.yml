@@ -10,16 +10,14 @@ http:
     type: json
     data: |-
       {
-        "person_id": "{{target_person_id}}"
+        "person_id": "{{collaborator_person_id}}"
       }
   auth:
     type: bearer
     token: "{{access_token}}"
   docs: >-
-    person_id должен принадлежать вашему графу И быть привязан к аккаунту ВТОРОГО пользователя
-    (linked_user_id заполнен). В линейном прогоне одного пользователя {{target_person_id}} обычно
-    не подходит (не привязан ни к кому) — заполните вручную person_id второго зарегистрированного
-    аккаунта для реального теста этого запроса.
+    collaborator_person_id заполняется сценарием scenario/12-15 (создаёт узел, присоединяет к нему
+    user3) — прогоните папку scenario/ целиком перед этим запросом для реального 200.
 
 runtime:
   assertions:
