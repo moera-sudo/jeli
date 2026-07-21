@@ -5,12 +5,12 @@ info:
 
 http:
   method: GET
-  url: "{{base_url}}/search?q=aitbay"
+  url: "{{base_url}}/search?q=zhenya"
   auth:
     type: bearer
     token: "{{access_token}}"
   docs: >-
-    Подстрока из фамилии user2 (Aitbayeva, scenario/3), без учёта регистра. person_id должен быть
+    Подстрока из фамилии user2 (Zhenya, scenario/3), без учёта регистра. person_id должен быть
     реальным UUID — граф user2 уже создан в scenario/5, до того как эта папка (seq 13) запускается.
 
 runtime:

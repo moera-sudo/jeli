@@ -5,7 +5,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -70,6 +70,9 @@ class Person(Base):
     source_type: Mapped[str] = mapped_column(String(32), nullable=False, default=DEFAULT_SOURCE_TYPE)
     has_attached_file: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     file_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    # * Свободный рассказ об этом человеке — особенно важен для умерших/незарегистрированных узлов,
+    # * у которых нет собственного профиля, чтобы рассказать о себе (см. User.description).
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     confirmation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # * Одноразовый код для линковки реального аккаунта к этому узлу (см. POST /persons/{id}/invite-code).

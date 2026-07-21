@@ -526,6 +526,7 @@ async def get_person_detail(db: AsyncSession, person_id: uuid.UUID, current_user
         source_type=person.source_type,
         has_attached_file=person.has_attached_file,
         file_url=person.file_url,
+        description=person.description,
         confirmation_count=person.confirmation_count,
         created_at=person.created_at,
         updated_at=person.updated_at,
@@ -582,6 +583,7 @@ def _build_person(
         source_type=data.source_type,
         has_attached_file=data.has_attached_file,
         file_url=data.file_url,
+        description=data.description,
     )
 
 
@@ -837,10 +839,24 @@ async def link_existing_person_by_invite_code(db: AsyncSession, user: User, invi
     if person is None or person.linked_user_id is not None:
         return None
     person.linked_user_id = user.id
-    # * Копируем на User только то, что там ещё не заполнено — не затираем то, что человек уже указал сам.
-    for field in ("gender", "ru", "tribe", "zhuz", "birth_country"):
-        if getattr(user, field) is None:
+    # * Приоритет данных САМОГО пользователя над тем, что вписал владелец графа при заведении узла —
+    # * человек только что явно подтвердил эти данные о себе при регистрации, это авторитетнее догадки
+    # * владельца. Если у user поле пусто — как раньше, наоборот, подтягиваем его с узла на аккаунт.
+    # ! avatar_url сюда намеренно не входит: у User всегда стоит DEFAULT_AVATAR_URL (никогда не None),
+    # ! включение этого поля в правило стёрло бы реальную аватарку узла заглушкой при каждом join'е.
+    name_changed = False
+    for field in ("last_name", "first_name", "patronymic", "gender", "birth_country", "ru", "tribe", "zhuz", "description"):
+        user_value = getattr(user, field)
+        if user_value is not None:
+            setattr(person, field, user_value)
+            if field in ("last_name", "first_name", "patronymic"):
+                name_changed = True
+        else:
             setattr(user, field, getattr(person, field))
+    if name_changed:
+        # ! Пересчёт normalized_name ОБЯЗАТЕЛЕН при правке ФИО — иначе pg_trgm-индекс мэтчинга
+        # ! тихо расходится с актуальными данными узла (тот же паттерн, что в update_person).
+        person.normalized_name = normalize_name(person.last_name, person.first_name, person.patronymic)
     await db.commit()
     await db.refresh(person)
     await db.refresh(user)
@@ -862,6 +878,7 @@ async def create_root_person_for_user(db: AsyncSession, user: User) -> Person:
         gender=user.gender,
         avatar_url=user.avatar_url,
         is_alive=True,
+        description=user.description,
     )
     db.add(person)
     await db.commit()

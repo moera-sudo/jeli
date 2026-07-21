@@ -10,10 +10,10 @@ http:
     type: json
     data: |-
       {
-        "email": "userr@example.com",
+        "email": "evgen@example.com",
         "password": "string123",
-        "last_name": "Aitbayeva",
-        "first_name": "Saltanat",
+        "last_name": "Zhenya",
+        "first_name": "Evgenya",
         "patronymic": null,
         "graph_invite_code": ""
       }
