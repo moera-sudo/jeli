@@ -38,8 +38,12 @@ export default function PersonNode({ data, selected }) {
 
   return (
     <div className={className}>
-      <Handle type="target" position={Position.Top} style={handleStyle} isConnectable={false} />
-      <Handle type="source" position={Position.Bottom} style={handleStyle} isConnectable={false} />
+      {/* Anchors: top = incoming descent, bottom = outgoing descent, left/right =
+          the horizontal marriage line to the couple's union dot. */}
+      <Handle id="t" type="target" position={Position.Top} style={handleStyle} isConnectable={false} />
+      <Handle id="b" type="source" position={Position.Bottom} style={handleStyle} isConnectable={false} />
+      <Handle id="l" type="source" position={Position.Left} style={handleStyle} isConnectable={false} />
+      <Handle id="r" type="source" position={Position.Right} style={handleStyle} isConnectable={false} />
 
       {isFocus && <span className={styles.youBadge}>Это вы</span>}
 

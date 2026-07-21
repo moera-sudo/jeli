@@ -20,21 +20,14 @@ import dagre from '@dagrejs/dagre';
 export const NODE_SIZE = { width: 210, height: 136 };
 export const UNION_SIZE = { width: 14, height: 14 };
 
-const ROW_GAP = 260;    // vertical distance between generations (centre to centre)
-const INNER_GAP = 74;   // gap between the two cards of a couple (union sits here)
-const BLOCK_GAP = 70;   // gap between neighbouring blocks in a row
+const ROW_GAP = 200;    // vertical distance between generations (centre to centre)
+const INNER_GAP = 46;   // gap between the two cards of a couple (union sits here)
+const BLOCK_GAP = 48;   // gap between neighbouring blocks in a row
 const SWEEPS = 8;       // refinement iterations for the X coordinate
 
 const unionId = (key) => `union::${key}`;
 const coupleKey = (a, b) => [a, b].sort().join('::');
 const avg = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
-
-// Orthogonal routing (down out of a source, into the top of a target) keeps the
-// spouse/descent lines in vertical channels + row gaps so they never cut across
-// cards or fan out diagonally into each other.
-function treeEdge(id, source, target, style, data = {}) {
-  return { id, source, target, type: 'smoothstep', pathOptions: { borderRadius: 12 }, style, data };
-}
 
 /**
  * @param {object} graph  GraphResponse { focus_person_id, persons, relationships }.
@@ -221,10 +214,12 @@ export function buildFlow(graph) {
   const spouseSpan = NODE_SIZE.width + INNER_GAP; // centre-to-centre of the two cards
 
   const nodes = [];
+  const personCenterX = new Map();
   for (const p of persons) {
     const block = blockOf.get(p.id);
     let cx = block.center;
     if (block.type === 'couple') cx += (p.id === block.left ? -spouseSpan / 2 : spouseSpan / 2);
+    personCenterX.set(p.id, cx);
     const cy = rowY(genOf(p.id));
     nodes.push({
       id: p.id,
@@ -235,12 +230,10 @@ export function buildFlow(graph) {
   }
   for (const { a, key } of couples.values()) {
     const block = blockByCouple.get(key);
-    const parentY = rowY(genOf(a));
-    const hasKids = coupleHasKids(key);
-    // The union always sits BELOW the couple's cards so the two spouse lines drop
-    // down and converge into it (orthogonal routing). With kids it sits midway to
-    // the children's row (the descent branch point); childless, just under the pair.
-    const cy = parentY + (hasKids ? ROW_GAP / 2 : NODE_SIZE.height / 2 + 24);
+    // The union sits ON the couple's centre line, in the gap between their two
+    // cards: the marriage line is a horizontal segment through it, and (if there
+    // are kids) the descent trunk drops straight down from it to the sibling bar.
+    const cy = rowY(genOf(a));
     nodes.push({
       id: unionId(key),
       type: 'union',
@@ -264,27 +257,60 @@ export function buildFlow(graph) {
   const matchStyle = { stroke: '#c084fc', strokeWidth: 2, strokeDasharray: '6 5' };
 
   const edges = [];
+  // Marriage: a horizontal line connecting the two spouses through the union dot.
+  // Left spouse's RIGHT side → union LEFT; right spouse's LEFT side → union RIGHT.
   for (const { a, b, key } of couples.values()) {
-    edges.push(treeEdge(`${key}::sa`, a, unionId(key), spouseStyle));
-    edges.push(treeEdge(`${key}::sb`, b, unionId(key), spouseStyle));
+    const block = blockByCouple.get(key);
+    const [left, right] = block ? [block.left, block.right] : (seedX(a) <= seedX(b) ? [a, b] : [b, a]);
+    edges.push({ id: `${key}::sl`, source: left, sourceHandle: 'r', target: unionId(key), targetHandle: 'l', type: 'straight', style: spouseStyle, data: {} });
+    edges.push({ id: `${key}::sr`, source: right, sourceHandle: 'l', target: unionId(key), targetHandle: 'r', type: 'straight', style: spouseStyle, data: {} });
   }
+  // Stagger the sibling bars: give every descent source (a union, or a single
+  // parent) a bar height, then alternate the heights of spatially-adjacent
+  // sources in the same child row so their horizontal buses never merge into one
+  // ambiguous line. Children of the SAME source keep the same bar (one clean bus).
+  const sourceInfo = new Map(); // sourceId → { x, childGen }
   for (const [key, kids] of unionChildren) {
-    for (const childId of kids) {
-      edges.push(treeEdge(`${key}->${childId}`, unionId(key), childId, descentStyle,
-        { kind: 'descent', childId, links: descentLinks(childId) }))
-    }
+    if (!kids.length) continue;
+    const ub = blockByCouple.get(key);
+    sourceInfo.set(unionId(key), { x: ub ? ub.center : 0, childGen: genOf(kids[0]) });
   }
   for (const [childId, parents] of parentsOf) {
-    if (parents.length === 1) {
-      edges.push(treeEdge(`${parents[0]}->${childId}`, parents[0], childId, descentStyle,
-        { kind: 'descent', childId, links: descentLinks(childId) }))
+    if (parents.length === 1 && !sourceInfo.has(parents[0])) {
+      sourceInfo.set(parents[0], { x: personCenterX.get(parents[0]) ?? 0, childGen: genOf(childId) });
     }
+  }
+  const barOffsetOf = new Map();
+  const sourcesByGen = new Map();
+  for (const [id, info] of sourceInfo) {
+    if (!sourcesByGen.has(info.childGen)) sourcesByGen.set(info.childGen, []);
+    sourcesByGen.get(info.childGen).push({ id, x: info.x });
+  }
+  for (const arr of sourcesByGen.values()) {
+    arr.sort((m, n) => m.x - n.x);
+    arr.forEach((s, i) => barOffsetOf.set(s.id, (i % 2) * 18)); // alternate 0 / 18 px
+  }
+
+  // Descent: a custom edge — vertical trunk down from the union bottom to a sibling
+  // bar just above the children's row, then a short stub into each child's top.
+  const descentEdge = (id, source, childId) => ({
+    id, source, sourceHandle: 'b', target: childId, targetHandle: 't',
+    type: 'descent', style: descentStyle,
+    data: { kind: 'descent', childId, links: descentLinks(childId), barOffset: barOffsetOf.get(source) ?? 0 },
+  });
+  for (const [key, kids] of unionChildren) {
+    for (const childId of kids) edges.push(descentEdge(`${key}->${childId}`, unionId(key), childId));
+  }
+  for (const [childId, parents] of parentsOf) {
+    if (parents.length === 1) edges.push(descentEdge(`${parents[0]}->${childId}`, parents[0], childId));
   }
   for (const rel of matchEdges) {
     edges.push({
       id: rel.id,
       source: rel.from_person_id,
+      sourceHandle: 'b',
       target: rel.to_person_id,
+      targetHandle: 't',
       type: 'straight',
       style: matchStyle,
       data: { type: rel.type },

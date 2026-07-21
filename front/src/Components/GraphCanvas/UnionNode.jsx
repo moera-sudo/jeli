@@ -13,8 +13,11 @@ export default function UnionNode() {
   const handleStyle = { opacity: 0, pointerEvents: 'none' }
   return (
     <div className={styles.unionNode} aria-hidden="true">
-      <Handle type="target" position={Position.Top} style={handleStyle} isConnectable={false} />
-      <Handle type="source" position={Position.Bottom} style={handleStyle} isConnectable={false} />
+      {/* left/right receive the two spouse lines (horizontal marriage); bottom
+          sends the descent trunk down to the children. */}
+      <Handle id="l" type="target" position={Position.Left} style={handleStyle} isConnectable={false} />
+      <Handle id="r" type="target" position={Position.Right} style={handleStyle} isConnectable={false} />
+      <Handle id="b" type="source" position={Position.Bottom} style={handleStyle} isConnectable={false} />
     </div>
   )
 }

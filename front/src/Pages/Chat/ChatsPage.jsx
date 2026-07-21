@@ -18,15 +18,12 @@ function formatTime(iso) {
   return Number.isNaN(d.getTime()) ? '' : TIME_FMT.format(d)
 }
 
-// Images are sent as `![image](url)` markdown — show a friendly «Фото» in the
-// list preview instead of the raw markdown.
 const IMAGE_MD = /^\s*!\[[^\]]*]\([^)]*\)\s*$/
 function previewText(content) {
   if (!content) return ''
   return IMAGE_MD.test(content) ? 'Фото' : content
 }
 
-/** Conversation list, backed by GET /chats (+ peer profiles for name/avatar). */
 export default function ChatsPage() {
   const [chats, setChats] = useState(null)
   const [peers, setPeers] = useState({})
@@ -70,7 +67,6 @@ export default function ChatsPage() {
       <main className={styles.main}>
         <header className={styles.head}>
           <h1 className={styles.title}>Чаты</h1>
-          <p className={styles.subtitle}>Общение с родственниками</p>
         </header>
 
         <div className={styles.search}>

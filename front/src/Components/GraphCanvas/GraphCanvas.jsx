@@ -4,6 +4,7 @@ import { ReactFlow, Background, Panel, ReactFlowProvider, useReactFlow, useViewp
 
 import PersonNode from './PersonNode'
 import UnionNode from './UnionNode'
+import DescentEdge, { CHILD_STUB } from './DescentEdge'
 import PersonProfileModal from './PersonProfileModal'
 import MemberProfileModal from './MemberProfileModal'
 import PersonFormModal from './PersonFormModal'
@@ -37,8 +38,9 @@ import {
 } from '../../api/graphService'
 import styles from './GraphCanvas.module.css'
 
-// Stable identity — React Flow warns if nodeTypes is rebuilt each render.
+// Stable identity — React Flow warns if nodeTypes/edgeTypes is rebuilt each render.
 const nodeTypes = { person: PersonNode, union: UnionNode }
+const edgeTypes = { descent: DescentEdge }
 
 /* ------------------------------------------------- SVG export (raster) --- */
 function esc(s) {
@@ -109,7 +111,7 @@ function wrapName(name, maxChars = 20, maxLines = 3) {
 }
 
 /** One family card, drawn to match the web `PersonNode` (card + avatar + dot + name). */
-function personCardSvg(p, x, y, isFocus, avatarDataUrl) {
+function personCardSvg(p, x, y, avatarDataUrl) {
   const w = NODE_SIZE.width
   const h = NODE_SIZE.height
   const cx = x + w / 2
@@ -141,13 +143,13 @@ function personCardSvg(p, x, y, isFocus, avatarDataUrl) {
       `<text x="${cx}" y="${firstBaseline + i * 16}" text-anchor="middle" font-family="sans-serif" font-size="14.5" font-weight="700" fill="${nameFill}">${esc(line)}</text>`)
     .join('')
 
+  // The current user's (focus) card is drawn identically to everyone else —
+  // no accent border, no badge — so nobody stands out in the exported image.
   const cardFill = deceased ? CARD.fillDeceased : CARD.fill
-  const stroke = isFocus ? CARD.accent : CARD.border
-  const strokeW = isFocus ? 2 : 1
 
   return `<g>
     <rect x="${x}" y="${y + 3}" width="${w}" height="${h}" rx="${CARD.radius}" fill="#eeeeee"/>
-    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${CARD.radius}" fill="${cardFill}" stroke="${stroke}" stroke-width="${strokeW}"/>
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${CARD.radius}" fill="${cardFill}" stroke="${CARD.border}" stroke-width="1"/>
     ${avatar}
     ${dot}
     ${nameSvg}
@@ -177,12 +179,18 @@ function buildSvg(nodes, edges, format, avatarMap = new Map()) {
   const H = Math.round(maxY - minY) + (bare ? 0 : 30)
   const shiftY = bare ? 0 : 30
 
-  // Size-aware centre — union nodes are tiny, so edges meet at their true point.
-  const center = (n) => {
-    const size = n.type === 'union' ? UNION_SIZE : NODE_SIZE
-    return {
-      x: n.position.x - minX + size.width / 2,
-      y: n.position.y - minY + size.height / 2 + shiftY,
+  // Handle-aware anchor point on a node (matches the interactive graph's handles).
+  const sizeOf = (n) => (n.type === 'union' ? UNION_SIZE : NODE_SIZE)
+  const anchor = (n, handle) => {
+    const s = sizeOf(n)
+    const bx = n.position.x - minX
+    const by = n.position.y - minY + shiftY
+    switch (handle) {
+      case 't': return { x: bx + s.width / 2, y: by }
+      case 'b': return { x: bx + s.width / 2, y: by + s.height }
+      case 'l': return { x: bx, y: by + s.height / 2 }
+      case 'r': return { x: bx + s.width, y: by + s.height / 2 }
+      default: return { x: bx + s.width / 2, y: by + s.height / 2 }
     }
   }
   const byId = new Map(nodes.map((n) => [n.id, n]))
@@ -192,9 +200,15 @@ function buildSvg(nodes, edges, format, avatarMap = new Map()) {
       const a = byId.get(e.source)
       const b = byId.get(e.target)
       if (!a || !b) return ''
-      const pa = center(a)
-      const pb = center(b)
-      return `<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}"${strokeAttrs(e.style)}/>`
+      const s = anchor(a, e.sourceHandle)
+      const t = anchor(b, e.targetHandle)
+      // Descent: vertical trunk → sibling bar (just above the child) → stub, with
+      // sharp right angles. Marriage/match: a straight line between the anchors.
+      if (e.data?.kind === 'descent') {
+        const barY = t.y - CHILD_STUB - (e.data?.barOffset ?? 0)
+        return `<path d="M ${s.x} ${s.y} L ${s.x} ${barY} L ${t.x} ${barY} L ${t.x} ${t.y}" fill="none" stroke-linejoin="miter"${strokeAttrs(e.style)}/>`
+      }
+      return `<line x1="${s.x}" y1="${s.y}" x2="${t.x}" y2="${t.y}"${strokeAttrs(e.style)}/>`
     })
     .join('')
 
@@ -203,7 +217,7 @@ function buildSvg(nodes, edges, format, avatarMap = new Map()) {
       const p = n.data.person
       const x = n.position.x - minX
       const y = n.position.y - minY + shiftY
-      return personCardSvg(p, x, y, n.data.isFocus, avatarMap.get(p.avatar_url))
+      return personCardSvg(p, x, y, avatarMap.get(p.avatar_url))
     })
     .join('')
 
@@ -389,13 +403,34 @@ function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraph
     loadCollaborators()
   }, [loadCollaborators])
 
-  const { nodes, edges } = useMemo(() => {
-    if (!graph) return { nodes: [], edges: [] }
-    const flow = buildFlow(graph)
-    // Fold selection into node state (we drive selection ourselves).
-    flow.nodes = flow.nodes.map((n) => ({ ...n, selected: n.id === selectedId }))
-    return flow
-  }, [graph, selectedId])
+  // Which connector is highlighted — hover wins, else the pinned (clicked) one.
+  const [hoverEdgeId, setHoverEdgeId] = useState(null)
+  const [pinnedEdgeId, setPinnedEdgeId] = useState(null)
+  const highlightId = hoverEdgeId ?? pinnedEdgeId
+
+  // Lay out once per graph; folding selection/highlight in below is cheap and
+  // avoids re-running the whole layout on every hover.
+  const baseFlow = useMemo(() => (graph ? buildFlow(graph) : { nodes: [], edges: [] }), [graph])
+
+  const nodes = useMemo(
+    () => baseFlow.nodes.map((n) => ({ ...n, selected: n.id === selectedId })),
+    [baseFlow, selectedId],
+  )
+
+  const edges = useMemo(() => {
+    if (!highlightId) return baseFlow.edges
+    // Repaint the active edge black + thick (solid, no dash) and render it last
+    // so it sits clearly on top of everything else.
+    const rest = []
+    let active = null
+    for (const e of baseFlow.edges) {
+      if (e.id === highlightId) {
+        active = { ...e, style: { ...e.style, stroke: '#1a1a1a', strokeWidth: 3.5, strokeDasharray: undefined } }
+      } else rest.push(e)
+    }
+    // Render it last so it draws on top of the other lines (but under the cards).
+    return active ? [...rest, active] : baseFlow.edges
+  }, [baseFlow, highlightId])
 
   const nameById = useMemo(() => {
     const m = new Map()
@@ -438,14 +473,18 @@ function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraph
     setModal({ kind: 'profile' })
   }, [loadDetail, focusId, navigate, isOwner])
 
-  // Owner-only: clicking a descent line manages that parent link (insert a
-  // generation between, or remove a mistaken link).
+  // Clicking any connector pins it highlighted (so anyone can trace who links to
+  // whom); the owner additionally gets the descent-line management modal.
   const handleEdgeClick = useCallback((_, edge) => {
+    setPinnedEdgeId((id) => (id === edge.id ? null : edge.id))
     if (!isOwner || edge.data?.kind !== 'descent') return
     const links = (edge.data.links ?? []).map((l) => ({ ...l, parentName: nameById.get(l.parentId) ?? 'родитель' }))
     if (!links.length) return
     setModal({ kind: 'edge', childId: edge.data.childId, childName: nameById.get(edge.data.childId) ?? 'ребёнок', links })
   }, [isOwner, nameById])
+
+  const handleEdgeMouseEnter = useCallback((_, edge) => setHoverEdgeId(edge.id), [])
+  const handleEdgeMouseLeave = useCallback(() => setHoverEdgeId(null), [])
 
   // Right-click suppresses the browser menu and, for the graph owner only,
   // opens the add-relative modal. Regular members never see the add window.
@@ -458,6 +497,7 @@ function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraph
   const clearSelection = useCallback(() => {
     setSelectedId(null)
     setDetail(null)
+    setPinnedEdgeId(null)
   }, [])
 
   const closeModal = useCallback(() => setModal(null), [])
@@ -713,9 +753,12 @@ function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraph
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodeClick={handleNodeClick}
         onNodeContextMenu={handleNodeContextMenu}
         onEdgeClick={handleEdgeClick}
+        onEdgeMouseEnter={handleEdgeMouseEnter}
+        onEdgeMouseLeave={handleEdgeMouseLeave}
         onPaneClick={clearSelection}
         nodesDraggable={false}
         nodesConnectable={false}
