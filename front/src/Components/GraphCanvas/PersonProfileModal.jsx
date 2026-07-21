@@ -135,7 +135,9 @@ export default function PersonProfileModal({
 
             {detail.can_edit && (
               <>
-                {!detail.linked_user_id && (
+                {/* Invite code links a REAL living account to the node — never
+                    offer it for a deceased person. */}
+                {!detail.linked_user_id && detail.is_alive && (
                   <Button variant="primary" size="sm" fullWidth trailingIcon={<UsersIcon />} onClick={onInvite}>
                     Скопировать код приглашения
                   </Button>
