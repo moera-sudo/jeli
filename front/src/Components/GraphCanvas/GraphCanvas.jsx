@@ -332,7 +332,7 @@ function GraphControls({ canvasRef, onExport, exporting }) {
 }
 
 /* ======================================================== component ===== */
-function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraphChanged }) {
+function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraphChanged, refreshSignal }) {
   const focusId = focusPerson.id
   const navigate = useNavigate()
   const { setCenter } = useReactFlow()
@@ -378,6 +378,20 @@ function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraph
   useEffect(() => {
     loadGraph()
   }, [loadGraph])
+
+  // Confirming a match/marriage proposal elsewhere (MatchesPanel) changes the graph
+  // without touching focusId, so loadGraph's own dependency never re-fires — the
+  // parent bumps refreshSignal instead to ask for a reload. Skip the mount tick
+  // (loadGraph above already covers it) so the graph isn't fetched twice on open.
+  const skippedFirstRefresh = useRef(false)
+  useEffect(() => {
+    if (refreshSignal === undefined) return
+    if (!skippedFirstRefresh.current) {
+      skippedFirstRefresh.current = true
+      return
+    }
+    loadGraph()
+  }, [refreshSignal, loadGraph])
 
   const loadDetail = useCallback(async (id) => {
     setDetailLoading(true)

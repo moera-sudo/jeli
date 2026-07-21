@@ -18,7 +18,10 @@ http:
         "birth_region": "Almaty",
         "birth_year_value": 1930,
         "birth_year_precision": "decade",
-        "source_type": "oral_tradition",
+        "ru": "Shaprashty",
+        "tribe": "Shaprashty",
+        "zhuz": "ulyzhuz",
+        "source_type": "family_document",
         "relation": {
           "to_person_id": "{{shared_ancestor_a}}",
           "type": "parent"

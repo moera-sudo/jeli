@@ -31,6 +31,9 @@ export default function HomePage() {
   const [error, setError] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [matchesOpen, setMatchesOpen] = useState(false)
+  // Bumped by MatchesPanel after confirming a match/proposal so GraphCanvas reloads
+  // (its own loadGraph only depends on focusId, which a match confirm never changes).
+  const [graphRefreshKey, setGraphRefreshKey] = useState(0)
 
 
   useEffect(() => {
@@ -96,6 +99,7 @@ export default function HomePage() {
             isOwner={isAdmin}
             currentUserId={user?.id}
             onGraphChanged={reloadMe}
+            refreshSignal={graphRefreshKey}
           />
         </div>
         <HistoryPanel
@@ -104,7 +108,13 @@ export default function HomePage() {
           ownerUserId={me.owner_user_id}
         />
       </main>
-      <MatchesPanel open={matchesOpen} onClose={() => setMatchesOpen(false)} user={user} isAdmin={isAdmin} />
+      <MatchesPanel
+        open={matchesOpen}
+        onClose={() => setMatchesOpen(false)}
+        user={user}
+        isAdmin={isAdmin}
+        onGraphRefreshNeeded={() => setGraphRefreshKey((k) => k + 1)}
+      />
     </div>
   )
 }

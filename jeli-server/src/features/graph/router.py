@@ -81,11 +81,13 @@ async def _attach_chat_thread_id(db: AsyncSession, detail: PersonDetail, current
     ),
 )
 async def create_graph(
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),
 ) -> PersonDetail:
     logger.info("Create graph request received by user %s", current_user.id)
     person = await graph_service.create_root_person_explicit(db, current_user)
+    background_tasks.add_task(matching_service.recompute_for_person_task, person.id)
     return await graph_service.get_person_detail(db, person.id, current_user)
 
 
@@ -101,11 +103,13 @@ async def create_graph(
 )
 async def join_graph(
     payload: GraphJoinRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),
 ) -> PersonDetail:
     logger.info("Join graph request received by user %s", current_user.id)
     person = await graph_service.join_graph_by_invite_code(db, current_user, payload.invite_code)
+    background_tasks.add_task(matching_service.recompute_for_person_task, person.id)
     return await graph_service.get_person_detail(db, person.id, current_user)
 
 
@@ -149,6 +153,8 @@ async def create_person(
     logger.info("Create person request received by user %s", current_user.id)
     person = await graph_service.create_person(db, current_user, payload)
     background_tasks.add_task(matching_service.recompute_for_person_task, person.id)
+    if payload.relation is not None:
+        background_tasks.add_task(matching_service.recompute_for_person_task, payload.relation.to_person_id)
     detail = await graph_service.get_person_detail(db, person.id, current_user)
     return await _attach_chat_thread_id(db, detail, current_user)
 
@@ -172,6 +178,8 @@ async def insert_person_between(
 ) -> PersonDetail:
     person = await graph_service.insert_person_between(db, current_user, payload)
     background_tasks.add_task(matching_service.recompute_for_person_task, person.id)
+    background_tasks.add_task(matching_service.recompute_for_person_task, payload.parent_id)
+    background_tasks.add_task(matching_service.recompute_for_person_task, payload.child_id)
     detail = await graph_service.get_person_detail(db, person.id, current_user)
     return await _attach_chat_thread_id(db, detail, current_user)
 

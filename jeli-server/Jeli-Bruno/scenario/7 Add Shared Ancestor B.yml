@@ -16,7 +16,12 @@ http:
         "gender": "male",
         "birth_country": "KZ",
         "birth_region": "Almaty",
-        "source_type": "oral_tradition",
+        "birth_year_value": 1955,
+        "birth_year_precision": "decade",
+        "ru": "Shaprashty",
+        "tribe": "Shaprashty",
+        "zhuz": "ulyzhuz",
+        "source_type": "family_document",
         "relation": {
           "to_person_id": "{{person_id_2}}",
           "type": "parent"

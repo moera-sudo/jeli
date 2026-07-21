@@ -130,6 +130,18 @@ function layoutComponent(persons, relationships, focusId, globalMaxGen) {
     }
   }
 
+  // personId → [matched partner personIds] — used to pull a match-bridged block
+  // toward its counterpart's block during the centring sweep (otherwise a node
+  // connected only by a match edge keeps whatever arbitrary X Dagre gave it).
+  const matchPartnersOf = new Map();
+  for (const rel of matchEdges) {
+    if (!personById.has(rel.from_person_id) || !personById.has(rel.to_person_id)) continue;
+    if (!matchPartnersOf.has(rel.from_person_id)) matchPartnersOf.set(rel.from_person_id, []);
+    matchPartnersOf.get(rel.from_person_id).push(rel.to_person_id);
+    if (!matchPartnersOf.has(rel.to_person_id)) matchPartnersOf.set(rel.to_person_id, []);
+    matchPartnersOf.get(rel.to_person_id).push(rel.from_person_id);
+  }
+
   /* --------- couples (unions): explicit spouses + parents of a shared child */
   const couples = new Map(); // key → { a, b, key }
   const spouseRelOfCouple = new Map(); // key → spouse_of relationship id (editable marriages)
@@ -270,6 +282,20 @@ function layoutComponent(persons, relationships, focusId, globalMaxGen) {
     return centers;
   };
 
+  // Centres of the block(s) holding this block's confirmed-match partner(s), if
+  // any — same-row only in practice, since the backend copies the bridge node's
+  // generation from its match anchor.
+  const matchCentersOf = (block) => {
+    const centers = [];
+    for (const m of block.members) {
+      for (const partner of matchPartnersOf.get(m) ?? []) {
+        const pb = blockOf.get(partner);
+        if (pb && pb !== block) centers.push(pb.center);
+      }
+    }
+    return centers;
+  };
+
   // Keep the fixed order (siblings stay contiguous) — never re-sort. Just push
   // right to remove overlaps, using a wider gap between different sub-families.
   const resolveRow = (blocks) => {
@@ -295,6 +321,13 @@ function layoutComponent(persons, relationships, focusId, globalMaxGen) {
       for (const block of rowBlocks.get(gen)) {
         const centers = childCentersOf(block);
         if (centers.length) block.center = avg(centers);
+      }
+      resolveRow(rowBlocks.get(gen));
+    }
+    for (const gen of rowGens) { // pull match-bridged blocks toward their matched counterpart
+      for (const block of rowBlocks.get(gen)) {
+        const centers = matchCentersOf(block);
+        if (centers.length) block.center = avg([block.center, ...centers]);
       }
       resolveRow(rowBlocks.get(gen));
     }

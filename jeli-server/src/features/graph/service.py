@@ -15,6 +15,7 @@ from src.features.graph.constants import (
     ETHNIC_SOURCE_DERIVED_FROM_RU,
     GRAPH_LINK_TYPE_MARRIAGE,
     GRAPH_LINK_TYPE_MATCH_CONFIRMED,
+    MATCH_STATUS_DISCARD,
     MAX_PARENTS_PER_PERSON,
     PROPOSAL_STATUS_CONFIRMED,
     PROPOSAL_STATUS_PENDING,
@@ -281,27 +282,30 @@ async def _collect_child_of_edges(db: AsyncSession, ids: set[uuid.UUID]) -> dict
 
 
 async def _expand_match_bridges(
-    db: AsyncSession, generation: dict[uuid.UUID, int]
-) -> tuple[dict[uuid.UUID, GraphEdge], dict[uuid.UUID, int]]:
+    db: AsyncSession, frontier: set[uuid.UUID], generation: dict[uuid.UUID, int]
+) -> tuple[dict[uuid.UUID, GraphEdge], set[uuid.UUID]]:
     # * match_confirmed graph_link не имеет обычного Relationship-ребра — рендерим отдельным псевдо-ребром.
-    # * Всегда один хоп (это не брак, а подтверждение "тот же человек") — без изменений от Этапа 3.
+    # ** Мост продолжает обход через найденного человека (как и действующий брак) — иначе вся его семья
+    # ** (предки/потомки со стороны мэтча) никогда не подгружается, виден только он сам.
     edges: dict[uuid.UUID, GraphEdge] = {}
-    ids = set(generation.keys())
+    newly_bridged: set[uuid.UUID] = set()
     link_rows = await db.execute(
         select(GraphLink).where(
             GraphLink.link_type == GRAPH_LINK_TYPE_MATCH_CONFIRMED,
-            (GraphLink.person_a_id.in_(ids)) | (GraphLink.person_b_id.in_(ids)),
+            (GraphLink.person_a_id.in_(frontier)) | (GraphLink.person_b_id.in_(frontier)),
         )
     )
     for link in link_rows.scalars():
         edges[link.id] = GraphEdge(
             id=link.id, from_person_id=link.person_a_id, to_person_id=link.person_b_id, type="match_confirmed"
         )
-        if link.person_a_id in generation and link.person_b_id not in generation:
+        if link.person_a_id in frontier and link.person_b_id not in generation:
             generation[link.person_b_id] = generation[link.person_a_id]
-        elif link.person_b_id in generation and link.person_a_id not in generation:
+            newly_bridged.add(link.person_b_id)
+        elif link.person_b_id in frontier and link.person_a_id not in generation:
             generation[link.person_a_id] = generation[link.person_b_id]
-    return edges, generation
+            newly_bridged.add(link.person_a_id)
+    return edges, newly_bridged
 
 
 async def _wave_traverse(
@@ -360,11 +364,13 @@ async def _wave_traverse(
             if spouse_id is not None and rel.marriage_end_reason is None:
                 next_frontier.add(spouse_id)
 
+        bridge_edges, newly_bridged = await _expand_match_bridges(db, frontier, generation)
+        edges.update(bridge_edges)
+        next_frontier.update(newly_bridged)
+
         frontier = next_frontier
         iterations += 1
 
-    bridge_edges, generation = await _expand_match_bridges(db, generation)
-    edges.update(bridge_edges)
     return edges, generation
 
 
@@ -470,7 +476,10 @@ async def get_person_matches(db: AsyncSession, person_id: uuid.UUID) -> list[Mat
     await get_person_or_404(db, person_id)
     result = await db.execute(
         select(MatchCandidate)
-        .where((MatchCandidate.person_a_id == person_id) | (MatchCandidate.person_b_id == person_id))
+        .where(
+            (MatchCandidate.person_a_id == person_id) | (MatchCandidate.person_b_id == person_id),
+            MatchCandidate.status != MATCH_STATUS_DISCARD,
+        )
         .order_by(MatchCandidate.score.desc())
     )
     return list(result.scalars())
@@ -488,7 +497,10 @@ async def get_user_matches(db: AsyncSession, target_user_id: uuid.UUID) -> list[
         return []
     result = await db.execute(
         select(MatchCandidate)
-        .where((MatchCandidate.person_a_id.in_(household_ids)) | (MatchCandidate.person_b_id.in_(household_ids)))
+        .where(
+            (MatchCandidate.person_a_id.in_(household_ids)) | (MatchCandidate.person_b_id.in_(household_ids)),
+            MatchCandidate.status != MATCH_STATUS_DISCARD,
+        )
         .order_by(MatchCandidate.score.desc())
     )
     return list(result.scalars())

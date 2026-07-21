@@ -44,8 +44,11 @@ function yearsText(p) {
  * @param {() => void} props.onClose
  * @param {object} props.user       Current UserMe (for `getUserMatches`).
  * @param {boolean} props.isAdmin   Owner of their own graph → gets the Requests tab.
+ * @param {() => void} [props.onGraphRefreshNeeded]  Confirming a match or a marriage
+ *   proposal changes the graph (a new match_confirmed bridge / spouse_of edge) — this
+ *   tells GraphCanvas to reload, since it otherwise only re-fetches on focus change.
  */
-export default function MatchesPanel({ open, onClose, user, isAdmin }) {
+export default function MatchesPanel({ open, onClose, user, isAdmin, onGraphRefreshNeeded }) {
   const [tab, setTab] = useState('matches')
   const [matches, setMatches] = useState(null)
   const [proposals, setProposals] = useState(null)
@@ -90,10 +93,11 @@ export default function MatchesPanel({ open, onClose, user, isAdmin }) {
     (p) => p.status === 'pending' && p.proposer_user_id === user.id,
   )
 
-  const act = async (fn, id) => {
+  const act = async (fn, id, { refreshGraph = false } = {}) => {
     try {
       await fn(id)
       await load()
+      if (refreshGraph) onGraphRefreshNeeded?.()
     } catch (err) {
       setError(err.message || 'Действие не выполнено')
     }
@@ -142,12 +146,12 @@ export default function MatchesPanel({ open, onClose, user, isAdmin }) {
           {loading ? (
             <Loader />
           ) : activeTab === 'matches' ? (
-            <MatchesList matches={matches} myOwnerId={myOwnerId} onConfirm={(id) => act(confirmMatch, id)} onReject={(id) => act(rejectMatch, id)} />
+            <MatchesList matches={matches} myOwnerId={myOwnerId} onConfirm={(id) => act(confirmMatch, id, { refreshGraph: true })} onReject={(id) => act(rejectMatch, id)} />
           ) : (
             <RequestsList
               incoming={incoming}
               outgoing={outgoing}
-              onConfirm={(id) => act(confirmProposal, id)}
+              onConfirm={(id) => act(confirmProposal, id, { refreshGraph: true })}
               onReject={(id) => act(rejectProposal, id)}
             />
           )}
