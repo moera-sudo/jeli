@@ -50,19 +50,6 @@
   font-weight: var(--font-weight-bold);
 }
 
-.headActions { display: inline-flex; align-items: center; gap: var(--space-2); }
-
-.markAll {
-  padding: 6px 10px;
-  font-size: 0.78rem;
-  font-weight: var(--font-weight-medium);
-  color: var(--color-accent);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-
-.markAll:hover { background: rgba(255, 118, 72, 0.1); }
-
 .close {
   display: inline-flex;
   align-items: center;
@@ -105,8 +92,14 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
+  width: 100%;
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
   transition: background 0.15s ease;
 }
 
@@ -167,6 +160,16 @@
 .itemBody {
   flex: 1;
   min-width: 0;
+}
+
+.itemSource {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 0.68rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
 }
 
 .itemTitle {

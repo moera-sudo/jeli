@@ -18,8 +18,7 @@ import { uploadMedia, resolveMediaUrl } from '../../api/mediaService'
 import styles from './HistoryPanel.module.css'
 
 const PLACEHOLDER =
-  '# Наш род\n\nЗапишите историю семьи в Markdown — предания, переезды, ремёсла и памятные даты…\n\n- **Асан** родился в 1938 году\n- Переезд рода в 1954 году\n\n> Легенда о происхождении рода Ботбай.'
-
+  '# Наш род\n\nЗапишите историю семьи в Markdown — предания, переезды, ремёсла и памятные даты…'
 /**
  * Family-history side panel — a real Markdown editor backed by `/family`.
  * Loads the current user's story, edits title + content with a formatting
@@ -37,14 +36,13 @@ export default function HistoryPanel({ open, onClose }) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [status, setStatus] = useState('') // e.g. "Сохранено"
+  const [status, setStatus] = useState('') 
   const [error, setError] = useState('')
 
   const editorRef = useRef(null)
   const fileRef = useRef(null)
   const loadedRef = useRef(false)
 
-  // Load the story the first time the panel is opened.
   useEffect(() => {
     if (!open || loadedRef.current) return
     loadedRef.current = true
@@ -62,8 +60,6 @@ export default function HistoryPanel({ open, onClose }) {
 
   const markDirty = () => { if (status) setStatus('') }
 
-  /* ------------------------------------------------ markdown editing ------ */
-  // Applies a transform to the textarea selection and restores the caret.
   const editSelection = (transform) => {
     const ta = editorRef.current
     if (!ta) return
@@ -113,7 +109,7 @@ export default function HistoryPanel({ open, onClose }) {
 
   const handleImagePick = async (event) => {
     const file = event.target.files?.[0]
-    event.target.value = '' // allow re-picking the same file
+    event.target.value = ''
     if (!file) return
     setError('')
     setUploading(true)
@@ -137,7 +133,6 @@ export default function HistoryPanel({ open, onClose }) {
     { icon: <ImageIcon />, label: 'Изображение', onClick: () => fileRef.current?.click() },
   ]
 
-  /* ------------------------------------------------------------- saving --- */
   const canSave = title.trim().length > 0 && !saving && !loading
 
   const handleSave = async () => {

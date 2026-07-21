@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import TopBar from '../../Components/TopBar/TopBar'
 import GraphCanvas from '../../Components/GraphCanvas/GraphCanvas'
@@ -8,7 +8,7 @@ import MatchesPanel from '../../Components/MatchesPanel/MatchesPanel'
 import Button from '../../UI/Button/Button'
 import Loader from '../../UI/Loader/Loader'
 import { UsersIcon, PlusIcon, ArrowRightIcon } from '../../UI/icons'
-import { getMyPerson, createGraph, joinGraph } from '../../api/graphService'
+import { getMyPerson, createGraph, joinGraph, updatePerson } from '../../api/graphService'
 import { useAuth } from '../../auth/AuthContext'
 import { ROUTES } from '../../Routes/Routes'
 import { isValidFamilyCode, normalizeInviteCode } from '../../utils/validation'
@@ -24,6 +24,7 @@ import styles from './HomePage.module.css'
  */
 export default function HomePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
 
   const [me, setMe] = useState(undefined) // undefined = loading, null = no tree
@@ -31,15 +32,35 @@ export default function HomePage() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [matchesOpen, setMatchesOpen] = useState(false)
 
+  // A match notification routes here with { openMatches } — open that tab, then
+  // clear the state so a refresh/back doesn't reopen it.
+  useEffect(() => {
+    if (location.state?.openMatches) {
+      setMatchesOpen(true)
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [location, navigate])
+
   const reloadMe = useCallback(async () => {
     setError('')
     try {
-      setMe(await getMyPerson())
+      let mine = await getMyPerson()
+      // Backfill the self node's avatar from the profile when it's missing.
+      // Only `create_root` copies avatar_url onto the node, so a usual user who
+      // JOINED a node by code (or set their avatar before joining) ends up with
+      // an avatar in their profile but none on their tree node. They can always
+      // edit their own linked node, so mirror the profile avatar onto it here.
+      if (mine?.id && user?.avatar_url && !mine.avatar_url) {
+        try {
+          mine = await updatePerson(mine.id, { avatar_url: user.avatar_url })
+        } catch { /* best-effort: the tree still loads without the face */ }
+      }
+      setMe(mine)
     } catch (err) {
       setError(err.message || 'Не удалось загрузить дерево')
       setMe(null)
     }
-  }, [])
+  }, [user?.avatar_url])
 
   useEffect(() => {
     reloadMe()

@@ -6,11 +6,9 @@ import Button from '../../UI/Button/Button'
 import { CameraIcon } from '../../UI/icons'
 import { joinFullName, formatPersonName } from '../../utils/fullName'
 import { uploadProfileAvatar, resolveMediaUrl } from '../../api/mediaService'
-// * Shared profile visuals — same stylesheet as the read-only Profile page,
-// * so the editable form looks exactly like the profile itself.
+import { getMyPerson, updatePerson } from '../../api/graphService'
 import styles from '../../Pages/Profile/Profile.module.css'
 
-/** Info-card field groups — mirror the read-only profile cards. */
 const GENERAL_FIELDS = [
   { name: 'birth_date', label: 'Дата рождения', type: 'date' },
   { name: 'birth_country', label: 'Страна рождения', placeholder: 'Казахстан' },
@@ -18,8 +16,6 @@ const GENERAL_FIELDS = [
   { name: 'current_country', label: 'Страна проживания', placeholder: 'Казахстан' },
   { name: 'current_city', label: 'Город проживания', placeholder: 'Ваш город' },
 ]
-
-// * Национальность lives with the origin fields (see requirement).
 const ORIGIN_FIELDS = [
   { name: 'nationality', label: 'Национальность', placeholder: 'Казах' },
   { name: 'zhuz', label: 'Жүз', placeholder: 'Старший' },
@@ -27,8 +23,6 @@ const ORIGIN_FIELDS = [
   { name: 'ru', label: 'Ру (род)', placeholder: 'Куандык' },
 ]
 
-// * `gender` is a segmented control (not a TextField) but still travels through
-// * the shared form state / payload pipeline.
 const FIELD_NAMES = [...GENERAL_FIELDS, ...ORIGIN_FIELDS].map((f) => f.name).concat('description', 'gender')
 
 const GENDER_OPTIONS = [
@@ -36,11 +30,6 @@ const GENDER_OPTIONS = [
   { value: 'female', label: 'Женский' },
 ]
 
-/**
- * Initial string state (null/undefined → '') from a user object.
- * The stored name columns (last_name/first_name/patronymic) map onto the
- * editor's surname/firstName/middleName keys.
- */
 function toFormState(source) {
   const base = FIELD_NAMES.reduce((acc, key) => {
     acc[key] = source?.[key] ?? ''
@@ -54,13 +43,6 @@ function toFormState(source) {
   }
 }
 
-/**
- * Keeps only non-empty (trimmed) fields for the request.
- * The three name parts map back onto the backend columns
- * (last_name/first_name/patronymic); patronymic is sent as null when cleared.
- * `avatar_url` is intentionally omitted — the avatar is a file upload that the
- * backend does not accept yet (layout only).
- */
 function buildPayload(state, includeName) {
   const payload = FIELD_NAMES.reduce((acc, key) => {
     const value = String(state[key] ?? '').trim()
@@ -131,6 +113,14 @@ export default function ProfileEditor({
       const updated = await uploadProfileAvatar(file)
       setAvatarPreview(updated.avatar_url)
       onAvatarChange?.(updated)
+      // The profile endpoint only sets the user's avatar_url, not the avatar on
+      // their own graph node (a separate field the tree renders). Mirror the same
+      // media URL onto that node so the face shows up in the graph too. Best-effort:
+      // the profile avatar is already saved even if this node sync fails.
+      try {
+        const me = await getMyPerson()
+        if (me?.id) await updatePerson(me.id, { avatar_url: updated.avatar_url })
+      } catch { /* user may not have a tree node yet, or lack edit rights */ }
     } catch (err) {
       setError(err.message || 'Не удалось загрузить аватар')
     } finally {

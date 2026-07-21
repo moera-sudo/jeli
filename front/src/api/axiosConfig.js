@@ -53,6 +53,12 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // For multipart uploads, drop the instance default `application/json` so axios
+  // can set `multipart/form-data` WITH the boundary itself — otherwise FastAPI
+  // can't parse the body and reports the `file` field as missing (422).
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 

@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { ROUTES } from '../../Routes/Routes'
 import { SearchIcon, BellIcon, BookIcon, ChatIcon, UsersIcon } from '../../UI/icons'
 import NotificationsPanel from '../Notifications/NotificationsPanel'
+import { listNotifications } from '../../api/notificationsService'
 import { useAuth } from '../../auth/AuthContext'
 import { resolveMediaUrl } from '../../api/mediaService'
 import logo from '../../assets/logo_2.png'
@@ -30,12 +31,28 @@ export default function TopBar({
 }) {
   const { user } = useAuth()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
-  // Opening the panel marks everything as read → the unread dot clears.
-  const [notificationsSeen, setNotificationsSeen] = useState(false)
+  // Whether the server still has unread notifications — drives the dot. Derived
+  // from the backend (not local state) so it survives a page reload.
+  const [hasUnread, setHasUnread] = useState(false)
 
+  const refreshUnread = useCallback(async () => {
+    try {
+      const unread = await listNotifications(true)
+      setHasUnread(unread.length > 0)
+    } catch {
+      setHasUnread(false)
+    }
+  }, [])
+
+  // Check for unread on mount (and whenever the account changes).
+  useEffect(() => {
+    refreshUnread()
+  }, [refreshUnread, user?.id])
+
+  // Opening the panel marks everything read server-side → clear the dot now.
   const toggleNotifications = () =>
     setNotificationsOpen((open) => {
-      if (!open) setNotificationsSeen(true)
+      if (!open) setHasUnread(false)
       return !open
     })
 
@@ -88,7 +105,7 @@ export default function TopBar({
           onClick={toggleNotifications}
         >
           <BellIcon />
-          {!notificationsSeen && <span className={styles.badge} aria-hidden="true" />}
+          {hasUnread && <span className={styles.badge} aria-hidden="true" />}
         </button>
         <Link to={ROUTES.chats} className={styles.iconButton} aria-label="Мои чаты">
           <ChatIcon />
