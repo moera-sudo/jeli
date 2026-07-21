@@ -45,12 +45,124 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+// Design tokens mirrored from the app so the export matches the web card 1:1.
+const CARD = { fill: '#ffffff', fillDeceased: '#f6f4f1', border: '#e0e0e0', accent: '#ff7648', radius: 14 }
+const AVATAR_R = 30
+const STATUS = { registered: '#22c55e', unregistered: '#ef4444' }
+
 /**
- * Rebuilds the current layout as a self-contained SVG string for rasterising.
- * PNG exports transparent and without a heading; JPEG paints a white background
- * and adds the "Родовое древо" title.
+ * Stroke attributes for an exported edge. Flattens any `rgba()` colour onto an
+ * opaque equivalent (composited over white) — a transparent PNG drops
+ * translucent pixels against dark/checkerboard backdrops, so the gray descent
+ * lines would otherwise disappear even though they show over JPEG's white fill.
  */
-function buildSvg(nodes, edges, format) {
+function strokeAttrs(style) {
+  const raw = style?.stroke ?? '#999999'
+  const width = style?.strokeWidth ?? 2
+  const dash = style?.strokeDasharray ? ` stroke-dasharray="${style.strokeDasharray}"` : ''
+  const m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(raw)
+  let color = raw
+  if (m) {
+    const a = m[4] != null ? Number(m[4]) : 1
+    const flat = (c) => Math.round(Number(c) * a + 255 * (1 - a))
+    color = `rgb(${flat(m[1])},${flat(m[2])},${flat(m[3])})`
+  }
+  return ` stroke="${color}" stroke-width="${width}"${dash}`
+}
+
+/** Fetches an image URL and resolves to a `data:` URL so it embeds inline. */
+async function fetchAsDataUrl(url) {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`fetch ${res.status}`)
+  const blob = await res.blob()
+  return await new Promise((resolve, reject) => {
+    const fr = new FileReader()
+    fr.onload = () => resolve(fr.result)
+    fr.onerror = () => reject(fr.error)
+    fr.readAsDataURL(blob)
+  })
+}
+
+/** The lucide "user" glyph used as the avatar placeholder, centred on (cx, cy). */
+function userGlyphSvg(cx, cy) {
+  const s = 30 / 24 // web renders the icon at 30px inside the 60px circle
+  return `<g transform="translate(${cx - 15}, ${cy - 15}) scale(${s})" fill="none" stroke="#8a8a8a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+  </g>`
+}
+
+/** Greedy word-wrap of a name into at most `maxLines` centred lines. */
+function wrapName(name, maxChars = 20, maxLines = 3) {
+  const lines = []
+  let cur = ''
+  for (const word of String(name).split(/\s+/).filter(Boolean)) {
+    const cand = cur ? `${cur} ${word}` : word
+    if (cand.length > maxChars && cur) { lines.push(cur); cur = word } else cur = cand
+  }
+  if (cur) lines.push(cur)
+  if (lines.length > maxLines) {
+    lines.length = maxLines
+    lines[maxLines - 1] = `${lines[maxLines - 1].slice(0, maxChars - 1)}…`
+  }
+  return lines.length ? lines : ['Без имени']
+}
+
+/** One family card, drawn to match the web `PersonNode` (card + avatar + dot + name). */
+function personCardSvg(p, x, y, isFocus, avatarDataUrl) {
+  const w = NODE_SIZE.width
+  const h = NODE_SIZE.height
+  const cx = x + w / 2
+  const deceased = !p.is_alive
+  const state = deceased ? 'deceased' : p.is_registered ? 'registered' : 'unregistered'
+  const acx = cx
+  const acy = y + 52 // avatar centre
+  const clipId = `av-${p.id}`
+
+  // Avatar: the real photo clipped to a circle, or the grey placeholder glyph.
+  const avatar = avatarDataUrl
+    ? `<clipPath id="${clipId}"><circle cx="${acx}" cy="${acy}" r="${AVATAR_R}"/></clipPath>
+       <circle cx="${acx}" cy="${acy}" r="${AVATAR_R}" fill="#f0f0f1"/>
+       <image x="${acx - AVATAR_R}" y="${acy - AVATAR_R}" width="${AVATAR_R * 2}" height="${AVATAR_R * 2}"
+         preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})" xlink:href="${avatarDataUrl}"/>`
+    : `<circle cx="${acx}" cy="${acy}" r="${AVATAR_R}" fill="#f0f0f1"/>${userGlyphSvg(acx, acy)}`
+
+  // Status dot — only for living people (deceased get none), bottom-right of the avatar.
+  const dot = p.is_alive
+    ? `<circle cx="${acx + 20.5}" cy="${acy + 20.5}" r="7.5" fill="${STATUS[state]}" stroke="#ffffff" stroke-width="2"/>`
+    : ''
+
+  // Name — wrapped and vertically centred in the lower half of the card.
+  const lines = wrapName(formatPersonName(p, 'Без имени'))
+  const nameFill = deceased ? '#8a8a8a' : '#1a1a1a'
+  const firstBaseline = y + 104 - (lines.length - 1) * 8 + 5
+  const nameSvg = lines
+    .map((line, i) =>
+      `<text x="${cx}" y="${firstBaseline + i * 16}" text-anchor="middle" font-family="sans-serif" font-size="14.5" font-weight="700" fill="${nameFill}">${esc(line)}</text>`)
+    .join('')
+
+  const cardFill = deceased ? CARD.fillDeceased : CARD.fill
+  const stroke = isFocus ? CARD.accent : CARD.border
+  const strokeW = isFocus ? 2 : 1
+
+  return `<g>
+    <rect x="${x}" y="${y + 3}" width="${w}" height="${h}" rx="${CARD.radius}" fill="#eeeeee"/>
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${CARD.radius}" fill="${cardFill}" stroke="${stroke}" stroke-width="${strokeW}"/>
+    ${avatar}
+    ${dot}
+    ${nameSvg}
+  </g>`
+}
+
+/**
+ * Rebuilds the current layout as a self-contained SVG string for rasterising,
+ * matching the on-screen graph (same cards, avatars, status dots, focus badge).
+ * PNG exports transparent and without a heading; JPEG paints a white background
+ * and adds the "Родовое древо" title. `avatarMap` holds pre-fetched data URLs
+ * (person.avatar_url → data URL) so photos embed inline instead of tainting the
+ * canvas at raster time.
+ */
+function buildSvg(nodes, edges, format, avatarMap = new Map()) {
   const personNodes = nodes.filter((n) => n.data?.person)
   if (!personNodes.length) return '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"></svg>'
   const bare = format === 'png'
@@ -82,8 +194,7 @@ function buildSvg(nodes, edges, format) {
       if (!a || !b) return ''
       const pa = center(a)
       const pb = center(b)
-      const dash = e.style?.strokeDasharray ? ` stroke-dasharray="${e.style.strokeDasharray}"` : ''
-      return `<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" stroke="${e.style?.stroke ?? '#999'}" stroke-width="2"${dash}/>`
+      return `<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}"${strokeAttrs(e.style)}/>`
     })
     .join('')
 
@@ -92,20 +203,7 @@ function buildSvg(nodes, edges, format) {
       const p = n.data.person
       const x = n.position.x - minX
       const y = n.position.y - minY + shiftY
-      const cx = x + NODE_SIZE.width / 2
-      const isFocus = n.data.isFocus
-      const deceased = !p.is_alive
-      const nameFill = deceased ? '#8a8a8a' : '#1a1a1a'
-      const displayName = formatPersonName(p)
-      const initial = esc((displayName || '?').trim()[0] || '?')
-      return `
-        <g>
-          <rect x="${x}" y="${y}" width="${NODE_SIZE.width}" height="${NODE_SIZE.height}" rx="16"
-            fill="#ffffff" stroke="${isFocus ? '#ff7648' : 'rgba(26,26,26,0.12)'}" stroke-width="${isFocus ? 2.5 : 1}"/>
-          <circle cx="${cx}" cy="${y + 40}" r="26" fill="#f0f0f1"/>
-          <text x="${cx}" y="${y + 47}" text-anchor="middle" font-family="sans-serif" font-size="20" font-weight="600" fill="#8a8a8a">${initial}</text>
-          <text x="${cx}" y="${y + NODE_SIZE.height - 22}" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="600" fill="${nameFill}">${esc(displayName)}</text>
-        </g>`
+      return personCardSvg(p, x, y, n.data.isFocus, avatarMap.get(p.avatar_url))
     })
     .join('')
 
@@ -114,7 +212,7 @@ function buildSvg(nodes, edges, format) {
     ? ''
     : `<text x="${pad}" y="${pad}" font-family="sans-serif" font-size="20" font-weight="700" fill="#1a1a1a">Родовое древо</text>`
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
     ${background}
     ${heading}
     <g>${edgeSvg}${nodeSvg}</g>
@@ -572,7 +670,21 @@ function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraph
   const handleExport = useCallback(async (format) => {
     setExporting(true)
     try {
-      await downloadSvgAsImage(buildSvg(nodes, edges, format), { format, fileName: 'family-tree' })
+      // Pre-fetch avatars as data URLs — external image URLs either fail to load
+      // or taint the canvas during rasterization, so they must be embedded inline.
+      const urls = new Set()
+      for (const n of nodes) {
+        const url = n.data?.person?.avatar_url
+        if (url) urls.add(url)
+      }
+      const avatarMap = new Map()
+      await Promise.all(
+        [...urls].map(async (url) => {
+          try { avatarMap.set(url, await fetchAsDataUrl(resolveMediaUrl(url))) }
+          catch { /* fall back to the placeholder glyph for this card */ }
+        }),
+      )
+      await downloadSvgAsImage(buildSvg(nodes, edges, format, avatarMap), { format, fileName: 'family-tree' })
     } finally {
       setExporting(false)
     }

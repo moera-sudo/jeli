@@ -13,50 +13,62 @@ import {
 } from '../../UI/icons'
 import Button from '../../UI/Button/Button'
 import Loader from '../../UI/Loader/Loader'
-import { getMyFamily, upsertFamily } from '../../api/familyService'
+import { getFamily, upsertFamily } from '../../api/familyService'
 import { uploadMedia, resolveMediaUrl } from '../../api/mediaService'
 import styles from './HistoryPanel.module.css'
 
 const PLACEHOLDER =
   '# Наш род\n\nЗапишите историю семьи в Markdown — предания, переезды, ремёсла и памятные даты…'
 /**
- * Family-history side panel — a real Markdown editor backed by `/family`.
- * Loads the current user's story, edits title + content with a formatting
- * toolbar (including image upload via `/media`), previews the rendered Markdown,
- * and saves back with `PUT /family`.
+ * Family-history side panel — one shared markdown "story" per family tree,
+ * keyed to the graph owner. EVERY member of the tree reads the SAME story
+ * (`GET /family/{ownerUserId}`) and may edit it: the backend writes edits under
+ * the graph owner regardless of who saves (`PUT /family`), so the one story is
+ * collaborative and the final version is visible to everyone. Opens on the
+ * Preview tab by default.
  *
  * @param {object}     props
- * @param {boolean}    props.open       Whether the panel is expanded.
- * @param {() => void} props.onClose    Collapses the panel.
+ * @param {boolean}    props.open         Whether the panel is expanded.
+ * @param {() => void} props.onClose      Collapses the panel.
+ * @param {string}     props.ownerUserId  Graph owner's user id — the story's key.
  */
-export default function HistoryPanel({ open, onClose }) {
-  const [tab, setTab] = useState('write')
+export default function HistoryPanel({ open, onClose, ownerUserId }) {
+  const [tab, setTab] = useState('preview')
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [status, setStatus] = useState('') 
+  const [status, setStatus] = useState('')
   const [error, setError] = useState('')
 
   const editorRef = useRef(null)
   const fileRef = useRef(null)
-  const loadedRef = useRef(false)
+  // Reload whenever the panel opens for a different tree owner.
+  const loadedKeyRef = useRef(null)
 
   useEffect(() => {
-    if (!open || loadedRef.current) return
-    loadedRef.current = true
+    if (!open || !ownerUserId || loadedKeyRef.current === ownerUserId) return
+    loadedKeyRef.current = ownerUserId
     setLoading(true)
-    getMyFamily()
+    setError('')
+    // The shared story lives under the graph owner — read it for everyone.
+    getFamily(ownerUserId)
       .then((family) => {
-        if (family) {
-          setTitle(family.title ?? '')
-          setContent(family.content ?? '')
+        setTitle(family?.title ?? '')
+        setContent(family?.content ?? '')
+      })
+      .catch((err) => {
+        // 404 just means the story hasn't been written yet — start blank.
+        if (err.status === 404) {
+          setTitle('')
+          setContent('')
+        } else {
+          setError(err.message || 'Не удалось загрузить историю')
         }
       })
-      .catch((err) => setError(err.message || 'Не удалось загрузить историю'))
       .finally(() => setLoading(false))
-  }, [open])
+  }, [open, ownerUserId])
 
   const markDirty = () => { if (status) setStatus('') }
 
@@ -151,13 +163,17 @@ export default function HistoryPanel({ open, onClose }) {
     }
   }
 
+  const markdownComponents = {
+    img: ({ node: _node, src, alt, ...props }) => <img {...props} src={resolveMediaUrl(src)} alt={alt || ''} />,
+  }
+
   return (
     <aside className={`${styles.panel} ${open ? styles.open : ''}`} aria-hidden={!open}>
       <div className={styles.inner}>
         <header className={styles.head}>
           <div className={styles.heading}>
             <h2 className={styles.title}>Родовая история</h2>
-            <span className={styles.subtitle}>Хроника семьи · Markdown</span>
+            <span className={styles.subtitle}>Общая хроника семьи · Markdown</span>
           </div>
           <button type="button" className={styles.close} aria-label="Свернуть панель" onClick={onClose}>
             <CloseIcon />
@@ -167,6 +183,7 @@ export default function HistoryPanel({ open, onClose }) {
         {loading ? (
           <div className={styles.centered}><Loader /></div>
         ) : (
+          /* ------ shared editor — every family member can edit and save --- */
           <>
             <input
               className={styles.docTitle}
@@ -221,11 +238,7 @@ export default function HistoryPanel({ open, onClose }) {
               ) : (
                 <div className={styles.preview}>
                   {content.trim() ? (
-                    <ReactMarkdown
-                      components={{ img: ({ node: _node, src, alt, ...props }) => <img {...props} src={resolveMediaUrl(src)} alt={alt || ''} /> }}
-                    >
-                      {content}
-                    </ReactMarkdown>
+                    <ReactMarkdown components={markdownComponents}>{content}</ReactMarkdown>
                   ) : (
                     <p className={styles.previewEmpty}>Пока пусто — напишите историю на вкладке «Написать».</p>
                   )}

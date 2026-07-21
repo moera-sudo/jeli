@@ -231,6 +231,13 @@
 
 .previewEmpty { color: var(--color-muted); font-style: italic; }
 
+/* Read-only view (family members): the saved record's title as a heading. */
+.readTitle {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-4);
+}
+
 .centered {
   flex: 1;
   display: flex;

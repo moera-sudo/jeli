@@ -15,8 +15,11 @@ import styles from './GraphCanvas.module.css'
  * Status dot (a full little circle sitting on the avatar's surface):
  *   registered + alive → green · unregistered + alive → red · deceased → none.
  *
- * The two handles are centred and invisible; with `nodesConnectable={false}`
- * they only serve as fixed endpoints so edges run node-centre to node-centre.
+ * The handles are invisible and anchored to the card's top/bottom edges (not the
+ * centre): a child receives its descent line at the top, a parent sends theirs
+ * from the bottom. Combined with orthogonal (smoothstep) edges, lines stay in the
+ * vertical channels under nodes and the gaps between rows instead of cutting
+ * diagonally across cards. `nodesConnectable={false}` keeps them as fixed anchors.
  */
 export default function PersonNode({ data, selected }) {
   const { person, isFocus } = data
@@ -31,7 +34,7 @@ export default function PersonNode({ data, selected }) {
     .filter(Boolean)
     .join(' ')
 
-  const handleStyle = { opacity: 0, left: '50%', top: '50%', pointerEvents: 'none' }
+  const handleStyle = { opacity: 0, pointerEvents: 'none' }
 
   return (
     <div className={className}>

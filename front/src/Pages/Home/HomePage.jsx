@@ -99,7 +99,11 @@ export default function HomePage() {
         <div className={styles.graphWrap}>
           <GraphCanvas focusPerson={me} isOwner={isAdmin} currentUserId={user?.id} onGraphChanged={reloadMe} />
         </div>
-        <HistoryPanel open={historyOpen} onClose={() => setHistoryOpen(false)} />
+        <HistoryPanel
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          ownerUserId={me.owner_user_id}
+        />
       </main>
       <MatchesPanel open={matchesOpen} onClose={() => setMatchesOpen(false)} user={user} isAdmin={isAdmin} />
     </div>

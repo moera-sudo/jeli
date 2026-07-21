@@ -29,8 +29,11 @@ const unionId = (key) => `union::${key}`;
 const coupleKey = (a, b) => [a, b].sort().join('::');
 const avg = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
 
-function straightEdge(id, source, target, style, data = {}) {
-  return { id, source, target, type: 'straight', style, data };
+// Orthogonal routing (down out of a source, into the top of a target) keeps the
+// spouse/descent lines in vertical channels + row gaps so they never cut across
+// cards or fan out diagonally into each other.
+function treeEdge(id, source, target, style, data = {}) {
+  return { id, source, target, type: 'smoothstep', pathOptions: { borderRadius: 12 }, style, data };
 }
 
 /**
@@ -234,7 +237,10 @@ export function buildFlow(graph) {
     const block = blockByCouple.get(key);
     const parentY = rowY(genOf(a));
     const hasKids = coupleHasKids(key);
-    const cy = hasKids ? parentY + ROW_GAP / 2 : parentY;
+    // The union always sits BELOW the couple's cards so the two spouse lines drop
+    // down and converge into it (orthogonal routing). With kids it sits midway to
+    // the children's row (the descent branch point); childless, just under the pair.
+    const cy = parentY + (hasKids ? ROW_GAP / 2 : NODE_SIZE.height / 2 + 24);
     nodes.push({
       id: unionId(key),
       type: 'union',
@@ -259,18 +265,18 @@ export function buildFlow(graph) {
 
   const edges = [];
   for (const { a, b, key } of couples.values()) {
-    edges.push(straightEdge(`${key}::sa`, a, unionId(key), spouseStyle));
-    edges.push(straightEdge(`${key}::sb`, b, unionId(key), spouseStyle));
+    edges.push(treeEdge(`${key}::sa`, a, unionId(key), spouseStyle));
+    edges.push(treeEdge(`${key}::sb`, b, unionId(key), spouseStyle));
   }
   for (const [key, kids] of unionChildren) {
     for (const childId of kids) {
-      edges.push(straightEdge(`${key}->${childId}`, unionId(key), childId, descentStyle,
+      edges.push(treeEdge(`${key}->${childId}`, unionId(key), childId, descentStyle,
         { kind: 'descent', childId, links: descentLinks(childId) }))
     }
   }
   for (const [childId, parents] of parentsOf) {
     if (parents.length === 1) {
-      edges.push(straightEdge(`${parents[0]}->${childId}`, parents[0], childId, descentStyle,
+      edges.push(treeEdge(`${parents[0]}->${childId}`, parents[0], childId, descentStyle,
         { kind: 'descent', childId, links: descentLinks(childId) }))
     }
   }
