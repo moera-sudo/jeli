@@ -99,6 +99,7 @@ class PersonDetail(BaseModel):
     source_type: SourceType
     has_attached_file: bool
     file_url: str | None
+    description: str | None
     confirmation_count: int
     created_at: datetime
     updated_at: datetime
@@ -140,6 +141,7 @@ class PersonCreateRequest(BaseModel):
     source_type: SourceType = "oral_tradition"
     has_attached_file: bool = False
     file_url: str | None = None
+    description: str | None = None
     relation: PersonRelationInput | None = None
 
 
@@ -166,6 +168,7 @@ class PersonInsertBetweenRequest(BaseModel):
     source_type: SourceType = "oral_tradition"
     has_attached_file: bool = False
     file_url: str | None = None
+    description: str | None = None
     parent_id: uuid.UUID
     child_id: uuid.UUID
 
@@ -192,6 +195,7 @@ class PersonUpdateRequest(BaseModel):
     source_type: SourceType | None = None
     has_attached_file: bool | None = None
     file_url: str | None = None
+    description: str | None = None
 
 
 class RelationshipCreateRequest(BaseModel):

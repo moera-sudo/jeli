@@ -38,7 +38,7 @@ runtime:
         });
         test("returns created user with generated id", function () {
           expect(res.body.user.id).to.be.a("string");
-          expect(res.body.user.last_name).to.equal("Bystritskiy");
+          expect(res.body.user.last_name).to.equal("Doe");
         });
   assertions:
     - expression: res.status
