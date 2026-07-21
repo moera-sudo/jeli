@@ -10,11 +10,11 @@ http:
     type: json
     data: |-
       {
-        "email": "user2@example.com",
+        "email": "johndoe@example.com",
         "password": "string123",
-        "last_name": "Bystritskiy",
-        "first_name": "Trofim",
-        "patronymic": null,
+        "last_name": "Doe",
+        "first_name": "John",
+        "patronymic": "Besso",
         "graph_invite_code": ""
       }
   auth: inherit
