@@ -6,7 +6,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select, text, update
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.exceptions import ConflictError
@@ -70,6 +70,7 @@ from src.features.graph.schemas import (
 )
 from src.features.graph.ru_taxonomy import derive_tribe_zhuz
 from src.features.graph.utils import build_display_name, generate_invite_code, normalize_name
+from src.features.family.models import Family
 from src.features.notifications import service as notifications_service
 from src.features.notifications.constants import NOTIFICATION_TYPE_EXCLUDED_FROM_GRAPH
 from src.features.user import service as user_service
@@ -749,8 +750,25 @@ async def get_successor_candidates(db: AsyncSession, current_user: User) -> list
 
 
 async def transfer_ownership(db: AsyncSession, from_user_id: uuid.UUID, to_user_id: uuid.UUID) -> None:
+    # ** Всё, что привязано к ВЛАДЕЛЬЦУ графа, переезжает вместе с владением, а не только узлы —
+    # ** иначе общая история семьи и коллабораторы осиротеют под старым владельцем (family перестанет
+    # ** отображаться членам семьи, т.к. они читают её по новому owner_user_id).
     await db.execute(update(Person).where(Person.owner_user_id == from_user_id).values(owner_user_id=to_user_id))
-    logger.info("Graph ownership transferred: %s -> %s", from_user_id, to_user_id)
+    # * family.owner_user_id уникален — на всякий случай убираем возможную запись преемника (её быть не должно,
+    # * т.к. он член ЭТОГО графа) перед переносом, чтобы не словить конфликт уникальности.
+    await db.execute(delete(Family).where(Family.owner_user_id == to_user_id))
+    await db.execute(update(Family).where(Family.owner_user_id == from_user_id).values(owner_user_id=to_user_id))
+    # * Коллабораторы графа тоже переходят к новому владельцу; сам новый владелец не может быть себе коллаба.
+    await db.execute(
+        delete(GraphCollaborator).where(
+            GraphCollaborator.graph_owner_id == from_user_id,
+            GraphCollaborator.collaborator_user_id == to_user_id,
+        )
+    )
+    await db.execute(
+        update(GraphCollaborator).where(GraphCollaborator.graph_owner_id == from_user_id).values(graph_owner_id=to_user_id)
+    )
+    logger.info("Graph ownership transferred (persons+family+collaborators): %s -> %s", from_user_id, to_user_id)
 
 
 async def _owns_any_person(db: AsyncSession, user_id: uuid.UUID) -> bool:

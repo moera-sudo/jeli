@@ -44,12 +44,12 @@ export default function HistoryPanel({ open, onClose, ownerUserId }) {
 
   const editorRef = useRef(null)
   const fileRef = useRef(null)
-  // Reload whenever the panel opens for a different tree owner.
-  const loadedKeyRef = useRef(null)
 
+  // Refetch every time the panel opens (or the tree owner changes) — the shared
+  // story can change under us (edited by another member, ownership transfer),
+  // so we never serve a stale cache.
   useEffect(() => {
-    if (!open || !ownerUserId || loadedKeyRef.current === ownerUserId) return
-    loadedKeyRef.current = ownerUserId
+    if (!open || !ownerUserId) return
     setLoading(true)
     setError('')
     // The shared story lives under the graph owner — read it for everyone.
