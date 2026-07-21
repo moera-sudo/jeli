@@ -22,7 +22,8 @@ export const UNION_SIZE = { width: 14, height: 14 };
 
 const ROW_GAP = 200;    // vertical distance between generations (centre to centre)
 const INNER_GAP = 46;   // gap between the two cards of a couple (union sits here)
-const BLOCK_GAP = 48;   // gap between neighbouring blocks in a row
+const BLOCK_GAP = 48;   // gap between neighbouring blocks of the SAME family
+const FAMILY_GAP = 104; // wider gap between different sub-families in a row
 const SWEEPS = 8;       // refinement iterations for the X coordinate
 
 const unionId = (key) => `union::${key}`;
@@ -189,6 +190,22 @@ function layoutComponent(persons, relationships, focusId, globalMaxGen) {
   const blockByCouple = new Map(); // couple key → block
   const rowBlocks = new Map();     // gen → [block]
 
+  // A block's "family" — the parents it descends from (a couple's union, a lone
+  // parent, or itself if it has none / married in). `key` groups siblings; `seed`
+  // (the parents' Dagre x) orders families under their parents.
+  const familyAnchor = (members) => {
+    for (const m of members) {
+      const par = parentsOf.get(m) ?? [];
+      if (par.length >= 2) {
+        const key = coupleKey(par[0], par[1]);
+        const uid = unionId(key);
+        return { key: `u:${key}`, seed: g.node(uid) ? seedX(uid) : avg(par.map(seedX)) };
+      }
+      if (par.length === 1) return { key: `p:${par[0]}`, seed: seedX(par[0]) };
+    }
+    return { key: `r:${members[0]}`, seed: avg(members.map(seedX)) };
+  };
+
   for (const gen of rowGens) {
     const ids = rowPersons.get(gen).slice().sort((x, y) => seedX(x) - seedX(y));
     const rowSet = new Set(ids);
@@ -198,23 +215,29 @@ function layoutComponent(persons, relationships, focusId, globalMaxGen) {
       if (placed.has(pid)) continue;
       const key = personCouple.get(pid);
       const couple = key && couples.get(key);
+      let block;
       if (couple && rowSet.has(couple.a) && rowSet.has(couple.b)) {
         const [left, right] = seedX(couple.a) <= seedX(couple.b) ? [couple.a, couple.b] : [couple.b, couple.a];
-        const block = { type: 'couple', key, members: [left, right], left, right, width: 2 * NODE_SIZE.width + INNER_GAP, center: 0 };
-        blocks.push(block);
+        block = { type: 'couple', key, members: [left, right], left, right, width: 2 * NODE_SIZE.width + INNER_GAP, center: 0 };
         blockByCouple.set(key, block);
         blockOf.set(left, block);
         blockOf.set(right, block);
         placed.add(left);
         placed.add(right);
       } else {
-        const block = { type: 'single', members: [pid], member: pid, width: NODE_SIZE.width, center: 0 };
-        blocks.push(block);
+        block = { type: 'single', members: [pid], member: pid, width: NODE_SIZE.width, center: 0 };
         blockOf.set(pid, block);
         placed.add(pid);
       }
+      const anchor = familyAnchor(block.members);
+      block.familyKey = anchor.key; // siblings share this → kept contiguous
+      block.anchorSeed = anchor.seed;
+      block.seed = avg(block.members.map(seedX));
+      blocks.push(block);
     }
-    // Initial tight packing left-to-right.
+    // Fix the order once: group by family (siblings adjacent), families ordered by
+    // their parents' position. resolveRow never re-sorts, so this order is final.
+    blocks.sort((m, n) => m.anchorSeed - n.anchorSeed || m.seed - n.seed);
     let cursor = 0;
     for (const block of blocks) {
       block.center = cursor + block.width / 2;
@@ -247,12 +270,14 @@ function layoutComponent(persons, relationships, focusId, globalMaxGen) {
     return centers;
   };
 
+  // Keep the fixed order (siblings stay contiguous) — never re-sort. Just push
+  // right to remove overlaps, using a wider gap between different sub-families.
   const resolveRow = (blocks) => {
-    blocks.sort((a, b) => a.center - b.center);
     for (let i = 1; i < blocks.length; i++) {
       const prev = blocks[i - 1];
       const cur = blocks[i];
-      const minCenter = prev.center + prev.width / 2 + BLOCK_GAP + cur.width / 2;
+      const gap = prev.familyKey === cur.familyKey ? BLOCK_GAP : FAMILY_GAP;
+      const minCenter = prev.center + prev.width / 2 + gap + cur.width / 2;
       if (cur.center < minCenter) cur.center = minCenter;
     }
   };

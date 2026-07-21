@@ -27,13 +27,15 @@ export default function HomePage() {
   const location = useLocation()
   const { user } = useAuth()
 
-  const [me, setMe] = useState(undefined) // undefined = loading, null = no tree
+  const [me, setMe] = useState(undefined)
   const [error, setError] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [matchesOpen, setMatchesOpen] = useState(false)
+  // Header-search state: people to search over + the picked target (id + nonce).
+  const [people, setPeople] = useState([])
+  const [searchFocus, setSearchFocus] = useState(null)
 
-  // A match notification routes here with { openMatches } — open that tab, then
-  // clear the state so a refresh/back doesn't reopen it.
+
   useEffect(() => {
     if (location.state?.openMatches) {
       setMatchesOpen(true)
@@ -45,11 +47,7 @@ export default function HomePage() {
     setError('')
     try {
       let mine = await getMyPerson()
-      // Backfill the self node's avatar from the profile when it's missing.
-      // Only `create_root` copies avatar_url onto the node, so a usual user who
-      // JOINED a node by code (or set their avatar before joining) ends up with
-      // an avatar in their profile but none on their tree node. They can always
-      // edit their own linked node, so mirror the profile avatar onto it here.
+
       if (mine?.id && user?.avatar_url && !mine.avatar_url) {
         try {
           mine = await updatePerson(mine.id, { avatar_url: user.avatar_url })
@@ -75,7 +73,6 @@ export default function HomePage() {
     )
   }
 
-  // No tree yet → onboarding choices.
   if (me === null) {
     return (
       <div className={styles.page}>
@@ -90,6 +87,8 @@ export default function HomePage() {
   return (
     <div className={styles.page}>
       <TopBar
+        searchPeople={people}
+        onSearchPick={(id) => setSearchFocus({ id, n: Date.now() })}
         historyActive={historyOpen}
         onToggleHistory={() => setHistoryOpen((v) => !v)}
         matchesActive={matchesOpen}
@@ -97,7 +96,14 @@ export default function HomePage() {
       />
       <main className={styles.workspace}>
         <div className={styles.graphWrap}>
-          <GraphCanvas focusPerson={me} isOwner={isAdmin} currentUserId={user?.id} onGraphChanged={reloadMe} />
+          <GraphCanvas
+            focusPerson={me}
+            isOwner={isAdmin}
+            currentUserId={user?.id}
+            onGraphChanged={reloadMe}
+            onPeopleLoaded={setPeople}
+            searchFocus={searchFocus}
+          />
         </div>
         <HistoryPanel
           open={historyOpen}
@@ -124,7 +130,6 @@ function BlankHome({ onDone, onNeedGender, error }) {
       await createGraph()
       onDone()
     } catch (err) {
-      // Gender must be set on the profile before a tree can be created.
       if (err.status === 409 && /gender/i.test(err.message || '')) {
         onNeedGender()
         return

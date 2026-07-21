@@ -332,7 +332,7 @@ function GraphControls({ canvasRef, onExport, exporting }) {
 }
 
 /* ======================================================== component ===== */
-function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraphChanged }) {
+function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraphChanged, onPeopleLoaded, searchFocus }) {
   const focusId = focusPerson.id
   const navigate = useNavigate()
   const { setCenter } = useReactFlow()
@@ -368,12 +368,13 @@ function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraph
     try {
       const data = await getHouseholdGraph(focusId)
       setGraph(data)
+      onPeopleLoaded?.(data.persons ?? []) // feed the header search
     } catch (err) {
       setError(err.message || 'Не удалось загрузить дерево')
     } finally {
       setLoading(false)
     }
-  }, [focusId])
+  }, [focusId, onPeopleLoaded])
 
   useEffect(() => {
     loadGraph()
@@ -452,6 +453,22 @@ function GraphCanvasInner({ focusPerson, isOwner = false, currentUserId, onGraph
       { zoom: 1, duration: 300 },
     )
   }, [graph, nodes, setCenter])
+
+  // A header-search pick (id + nonce) → centre on that person and highlight them.
+  // The nonce guard fires it once per pick, not on every unrelated nodes update.
+  const searchFocusRef = useRef(null)
+  useEffect(() => {
+    if (!searchFocus?.n || searchFocusRef.current === searchFocus.n) return
+    const node = nodes.find((n) => n.id === searchFocus.id)
+    if (!node) return
+    searchFocusRef.current = searchFocus.n
+    setSelectedId(searchFocus.id)
+    setCenter(
+      node.position.x + NODE_SIZE.width / 2,
+      node.position.y + NODE_SIZE.height / 2,
+      { zoom: 1.15, duration: 400 },
+    )
+  }, [searchFocus, nodes, setCenter])
 
   /* -------------------------------------------------------- selection --- */
   // Left-click: clicking your own node jumps to the profile page; clicking
