@@ -10,6 +10,21 @@ import api from './axiosConfig';
  * reimplemented here — the server sends those flags ready to render.
  */
 
+/**
+ * Suggest tribe (тайпа) + zhuz (жүз) for a given ru (род) from the backend
+ * glossary (exact + fuzzy). Both fields are null when there's no match.
+ * GET /ru-taxonomy?ru=
+ *
+ * @param {string} ru
+ * @returns {Promise<{ tribe: string|null, zhuz: string|null }>}
+ */
+export async function suggestRuTaxonomy(ru) {
+  const q = String(ru ?? '').trim();
+  if (!q) return { tribe: null, zhuz: null };
+  const { data } = await api.get('/ru-taxonomy', { params: { ru: q } });
+  return data;
+}
+
 /* ----------------------------------------------------------- tree bootstrap */
 
 /**

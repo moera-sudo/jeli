@@ -27,8 +27,10 @@ from src.features.graph.schemas import (
     RelationshipProposalRead,
     RelationshipRead,
     RelationshipUpdateRequest,
+    RuTaxonomySuggestion,
     SuccessorCandidate,
 )
+from src.features.graph.ru_taxonomy import derive_tribe_zhuz
 from src.features.matching import service as matching_service
 from src.features.messenger import service as messenger_service
 from src.features.user.models import User
@@ -36,6 +38,27 @@ from src.features.user.models import User
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["graph"])
+
+
+@router.get(
+    "/ru-taxonomy",
+    response_model=RuTaxonomySuggestion,
+    summary="Подсказка тайпа/жуза по ру",
+    description=(
+        "По названию ру возвращает предполагаемые тайпа (tribe) и жуз (zhuz) из справочника ru_taxonomy "
+        "(точное совпадение + fuzzy-подбор). Если совпадений нет — оба поля null. Фронт использует это "
+        "для автоподстановки в профиле (пользователь может изменить значения)."
+    ),
+)
+async def suggest_ru_taxonomy(
+    ru: str = Query(..., min_length=1, max_length=255, description="Название ру"),
+    current_user: User = Depends(get_user),
+) -> RuTaxonomySuggestion:
+    derived = derive_tribe_zhuz(ru)
+    if derived is None:
+        return RuTaxonomySuggestion(tribe=None, zhuz=None)
+    tribe, zhuz = derived
+    return RuTaxonomySuggestion(tribe=tribe, zhuz=zhuz)
 
 
 async def _attach_chat_thread_id(db: AsyncSession, detail: PersonDetail, current_user: User) -> PersonDetail:

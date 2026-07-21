@@ -133,6 +133,13 @@ export default function PersonProfileModal({
               </section>
             )}
 
+            {detail.description && (
+              <section className={styles.pmCard}>
+                <h4 className={styles.pmCardTitle}>О человеке</h4>
+                <p className={styles.pmDescription}>{detail.description}</p>
+              </section>
+            )}
+
             {detail.can_edit && (
               <>
                 {/* Invite code links a REAL living account to the node — never

@@ -37,6 +37,7 @@ export default function PersonFormModal({ title, initial = {}, submitLabel, onSu
   const [deathYear, setDeathYear] = useState(
     initial.death_year_value != null ? String(initial.death_year_value) : '',
   )
+  const [description, setDescription] = useState(initial.description ?? '')
   const [avatar, setAvatar] = useState(initial.avatar_url ?? '')
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -94,6 +95,7 @@ export default function PersonFormModal({ title, initial = {}, submitLabel, onSu
       } else {
         values.death_year_value = null
       }
+      values.description = description.trim() || null
       await onSubmit(values)
     } catch (err) {
       setError(err.message || 'Не удалось сохранить')
@@ -202,6 +204,17 @@ export default function PersonFormModal({ title, initial = {}, submitLabel, onSu
               />
             </label>
           )}
+
+          <label className={styles.formLabel}>
+            Описание
+            <textarea
+              className={styles.formTextarea}
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Кем был этот человек, чем запомнился, история жизни…"
+            />
+          </label>
 
           {error && <p className={styles.formError} role="alert">{error}</p>}
 

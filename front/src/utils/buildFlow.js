@@ -21,9 +21,9 @@ export const NODE_SIZE = { width: 210, height: 136 };
 export const UNION_SIZE = { width: 14, height: 14 };
 
 const ROW_GAP = 200;    // vertical distance between generations (centre to centre)
-const INNER_GAP = 46;   // gap between the two cards of a couple (union sits here)
-const BLOCK_GAP = 48;   // gap between neighbouring blocks of the SAME family
-const FAMILY_GAP = 104; // wider gap between different sub-families in a row
+const INNER_GAP = 34;   // gap between the two cards of a couple (union sits here)
+const BLOCK_GAP = 28;   // gap between neighbouring blocks of the SAME family
+const FAMILY_GAP = 56;  // wider gap between different sub-families in a row
 const SWEEPS = 8;       // refinement iterations for the X coordinate
 
 const unionId = (key) => `union::${key}`;

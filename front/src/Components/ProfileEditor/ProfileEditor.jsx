@@ -6,7 +6,7 @@ import Button from '../../UI/Button/Button'
 import { CameraIcon } from '../../UI/icons'
 import { joinFullName, formatPersonName } from '../../utils/fullName'
 import { uploadProfileAvatar, resolveMediaUrl } from '../../api/mediaService'
-import { getMyPerson, updatePerson } from '../../api/graphService'
+import { getMyPerson, updatePerson, suggestRuTaxonomy } from '../../api/graphService'
 import styles from '../../Pages/Profile/Profile.module.css'
 
 const GENERAL_FIELDS = [
@@ -134,6 +134,27 @@ export default function ProfileEditor({
       if (avatarPreview?.startsWith('blob:')) URL.revokeObjectURL(avatarPreview)
     }
   }, [avatarPreview])
+
+  // Suggest тайпа/жуз from ру via the backend glossary. Fills ONLY empty fields,
+  // so it never overwrites what the user typed; re-runs (debounced) when ру changes.
+  useEffect(() => {
+    const ru = String(values.ru ?? '').trim()
+    if (!ru) return
+    let active = true
+    const timer = setTimeout(async () => {
+      try {
+        const { tribe, zhuz } = await suggestRuTaxonomy(ru)
+        if (!active) return
+        setValues((prev) => {
+          const next = { ...prev }
+          if (tribe && !String(prev.tribe ?? '').trim()) next.tribe = tribe
+          if (zhuz && !String(prev.zhuz ?? '').trim()) next.zhuz = zhuz
+          return next
+        })
+      } catch { /* suggestion is best-effort — silent on failure */ }
+    }, 400)
+    return () => { active = false; clearTimeout(timer) }
+  }, [values.ru])
 
   const handleSubmit = async (event) => {
     event.preventDefault()

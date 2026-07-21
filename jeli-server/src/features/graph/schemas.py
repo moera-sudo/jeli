@@ -278,3 +278,9 @@ class SuccessorCandidate(BaseModel):
     first_name: str | None
     patronymic: str | None
     avatar_url: str
+
+
+class RuTaxonomySuggestion(BaseModel):
+    # * Подсказка тайпа/жуз по ру из справочника ru_taxonomy. Оба поля null, если совпадений нет.
+    tribe: str | None
+    zhuz: str | None
