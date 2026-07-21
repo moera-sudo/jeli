@@ -1,0 +1,42 @@
+info:
+  name: WebSocket
+  type: websocket
+  seq: 17
+  description: >-
+    Ручная проверка единственного WS-эндпоинта приложения (/api/ws) — в одном канале приходят и
+    {"type":"message",...} (новое сообщение чата), и {"type":"notification",...} (в т.ч. new_message).
+    Подключаемся как user2 (access_token_2) — именно он получатель в паре user1->user2 из scenario/
+    и messenger/. Только GUI Bruno умеет исполнять websocket-запросы — CLI (`bru run`) пытается
+    прогнать и этот элемент тоже, падает на "Unsupported protocol ws:" и засчитывает его как 1
+    неудачный request (Tests/Assertions при этом всё равно 100% — у этого элемента их просто нет).
+    Чтобы CLI-регрессия не показывала этот ожидаемый "провал", гоняйте с флагом --tests-only:
+    `bru run . -r --env local --tests-only`.
+
+websocket:
+  url: "{{ws_base_url}}/ws?token={{access_token_2}}"
+  message:
+    type: json
+    data: "{}"
+  auth: inherit
+
+docs: >-
+  Как проверить обе доставки (сообщение чата + уведомление) в одном канале:
+
+  1. Прогнать коллекцию (или как минимум auth/ + scenario/ до "3 Register User2") — иначе
+  access_token_2 в environments/local.yml будет пустым и подключение не пройдёт авторизацию
+  (WS закрывается с кодом 1008 ДО accept() — см. get_user_ws в src/dependencies.py).
+
+  2. Нажать Connect в этой вкладке — сокет откроется от имени user2.
+
+  3. В другой вкладке выполнить messenger/Create Chat.yml (если чат ещё не создан) и сразу за ним
+  messenger/Send Message.yml — оба от имени user1 (access_token), отправителя.
+
+  4. В этой панели должны появиться ДВА события подряд:
+  {"type": "message", "message": {...}} — живой пуш нового сообщения,
+  {"type": "notification", "notification": {"type": "new_message", ...}} — уведомление о нём же.
+
+  Поле message выше (то, что можно отправить кнопкой из этой вкладки) сервером игнорируется —
+  /api/ws только слушает входящий текст и ничего с ним не делает (websocket_endpoint: async for _ in
+  websocket.iter_text(): pass). Отправка сообщения в чат — всегда отдельный REST-вызов
+  POST /chats/{id}/messages, а не что-то через сам сокет.
+

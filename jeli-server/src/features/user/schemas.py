@@ -56,6 +56,9 @@ class UserPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    # * Узел графа, привязанный к этому аккаунту (см. graph_service.get_linked_person) — не атрибут
+    # * User, поэтому default=None здесь и проставляется отдельно через model_copy(update=...) в роутере.
+    person_id: uuid.UUID | None = None
     last_name: str | None
     first_name: str | None
     patronymic: str | None

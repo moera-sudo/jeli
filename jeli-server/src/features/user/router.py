@@ -46,7 +46,8 @@ async def get_public_profile(
     current_user: User = Depends(get_user),
 ) -> UserPublic:
     user = await user_service.get_by_id_or_404(db, id)
-    return UserPublic.model_validate(user)
+    person = await graph_service.get_linked_person(db, id)
+    return UserPublic.model_validate(user).model_copy(update={"person_id": person.id if person else None})
 
 
 @router.patch(
