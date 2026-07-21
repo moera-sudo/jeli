@@ -1,6 +1,6 @@
 import { Outlet } from 'react-router-dom'
 
-import { AuthProvider } from '../auth/AuthContext'
+import { AuthProvider } from '../utils/AuthContext'
 
 /**
  * Root layout: wraps every route in the auth session provider so guards and

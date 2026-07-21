@@ -845,7 +845,10 @@ async def link_existing_person_by_invite_code(db: AsyncSession, user: User, invi
     # ! avatar_url сюда намеренно не входит: у User всегда стоит DEFAULT_AVATAR_URL (никогда не None),
     # ! включение этого поля в правило стёрло бы реальную аватарку узла заглушкой при каждом join'е.
     name_changed = False
-    for field in ("last_name", "first_name", "patronymic", "gender", "birth_country", "ru", "tribe", "zhuz", "description"):
+    # ! birth_country НАМЕРЕННО исключён из синхронизации: у User это свободный текст (напр. "Казахстан"),
+    # ! а у Person это короткий ISO-код (VARCHAR(8), напр. "KZ") — копирование имени страны в узел
+    # ! роняло join'ом StringDataRightTruncationError. Семантики полей несовместимы, поэтому не трогаем.
+    for field in ("last_name", "first_name", "patronymic", "gender", "ru", "tribe", "zhuz", "description"):
         user_value = getattr(user, field)
         if user_value is not None:
             setattr(person, field, user_value)

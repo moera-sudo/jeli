@@ -4,7 +4,7 @@ import TopBar from '../../Components/TopBar/TopBar'
 import ProfileEditor from '../../Components/ProfileEditor/ProfileEditor'
 import Loader from '../../UI/Loader/Loader'
 import { createProfile } from '../../api/profileService'
-import { useAuth } from '../../auth/AuthContext'
+import { useAuth } from '../../utils/AuthContext'
 import { ROUTES } from '../../Routes/Routes'
 import styles from './ProfileSetupPage.module.css'
 

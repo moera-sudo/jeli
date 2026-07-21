@@ -2,16 +2,35 @@ import { useCallback, useEffect, useState } from 'react'
 
 import Button from '../../UI/Button/Button'
 import Loader from '../../UI/Loader/Loader'
-import { CloseIcon, UsersIcon } from '../../UI/icons'
+import { CloseIcon, UsersIcon, UserIcon } from '../../UI/icons'
 import {
   getUserMatches,
   getMarriageProposals,
+  getPerson,
+  getMyPerson,
   confirmMatch,
   rejectMatch,
   confirmProposal,
   rejectProposal,
 } from '../../api/graphService'
+import { formatPersonName } from '../../utils/fullName'
+import { resolveMediaUrl } from '../../api/mediaService'
 import styles from './MatchesPanel.module.css'
+
+const STATUS_LABEL = {
+  high_confidence: 'Высокая уверенность',
+  possible_match: 'Возможное совпадение',
+  confirmed: 'Подтверждённый родственник',
+}
+
+function yearsText(p) {
+  const b = p?.birth_year_value
+  const d = p?.death_year_value
+  if (b && d) return `${b}–${d}`
+  if (b) return `род. ${b}`
+  if (d) return `ум. ${d}`
+  return ''
+}
 
 /**
  * Home-only side panel. Two tabs:
@@ -32,6 +51,14 @@ export default function MatchesPanel({ open, onClose, user, isAdmin }) {
   const [proposals, setProposals] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // My graph owner id — used to tell which anchor of a match is the RELATIVE
+  // (the one that isn't in my own graph) vs my own person.
+  const [myOwnerId, setMyOwnerId] = useState(null)
+
+  useEffect(() => {
+    if (!open) return
+    getMyPerson().then((p) => setMyOwnerId(p?.owner_user_id ?? null)).catch(() => {})
+  }, [open])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -115,7 +142,7 @@ export default function MatchesPanel({ open, onClose, user, isAdmin }) {
           {loading ? (
             <Loader />
           ) : activeTab === 'matches' ? (
-            <MatchesList matches={matches} onConfirm={(id) => act(confirmMatch, id)} onReject={(id) => act(rejectMatch, id)} />
+            <MatchesList matches={matches} myOwnerId={myOwnerId} onConfirm={(id) => act(confirmMatch, id)} onReject={(id) => act(rejectMatch, id)} />
           ) : (
             <RequestsList
               incoming={incoming}
@@ -130,7 +157,7 @@ export default function MatchesPanel({ open, onClose, user, isAdmin }) {
   )
 }
 
-function MatchesList({ matches, onConfirm, onReject }) {
+function MatchesList({ matches, myOwnerId, onConfirm, onReject }) {
   if (!matches?.length) {
     return (
       <div className={styles.empty}>
@@ -143,19 +170,95 @@ function MatchesList({ matches, onConfirm, onReject }) {
   return (
     <ul className={styles.list}>
       {matches.map((m) => (
-        <li key={m.id} className={styles.item}>
-          <div className={styles.itemBody}>
-            <p className={styles.itemTitle}>Возможное совпадение</p>
-            {m.relation_path_to_viewer && <p className={styles.itemText}>{m.relation_path_to_viewer}</p>}
-            <span className={styles.score}>Совпадение: {Math.round((m.score ?? 0) * 100)}%</span>
-          </div>
-          <div className={styles.actions}>
-            <Button variant="accent" size="sm" onClick={() => onConfirm(m.id)}>Подтвердить</Button>
-            <Button variant="primary" size="sm" onClick={() => onReject(m.id)}>Отклонить</Button>
-          </div>
-        </li>
+        <MatchCard key={m.id} match={m} myOwnerId={myOwnerId} onConfirm={onConfirm} onReject={onReject} />
       ))}
     </ul>
+  )
+}
+
+/**
+ * A single match: the potential relative's full card + the reasoning (the
+ * matched ancestor chain) behind why the system thinks you're related.
+ */
+function MatchCard({ match, myOwnerId, onConfirm, onReject }) {
+  const [relative, setRelative] = useState(null)
+  const [showWhy, setShowWhy] = useState(false)
+
+  // The match links two people; show the one that ISN'T in my own graph.
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const [a, b] = await Promise.all([getPerson(match.person_a_id), getPerson(match.person_b_id)])
+        const rel = myOwnerId && a.owner_user_id !== myOwnerId ? a : b
+        if (active) setRelative(rel)
+      } catch { /* keep the reasoning even if the profile fetch fails */ }
+    })()
+    return () => { active = false }
+  }, [match.person_a_id, match.person_b_id, myOwnerId])
+
+  const ev = match.evidence || {}
+  const chain = Array.isArray(ev.chain) ? ev.chain : []
+  const place = relative ? [relative.birth_region, relative.birth_country].filter(Boolean).join(', ') : ''
+  const rod = relative ? [relative.ru, relative.tribe, relative.zhuz].filter(Boolean).join(' · ') : ''
+  const sub = [yearsText(relative), place].filter(Boolean).join(' · ')
+
+  return (
+    <li className={styles.item}>
+      <div className={styles.matchHead}>
+        <span className={styles.matchAvatar} aria-hidden="true">
+          {relative?.avatar_url ? <img src={resolveMediaUrl(relative.avatar_url)} alt="" /> : <UserIcon />}
+        </span>
+        <div className={styles.matchIdent}>
+          <p className={styles.matchName}>{relative ? formatPersonName(relative, 'Возможный родственник') : 'Загрузка…'}</p>
+          {sub && <p className={styles.matchMeta}>{sub}</p>}
+        </div>
+        <span className={styles.scoreBadge}>{Math.round((match.score ?? 0) * 100)}%</span>
+      </div>
+
+      {relative && (match.relation_path_to_viewer || rod || relative.description) && (
+        <div className={styles.matchInfo}>
+          {match.relation_path_to_viewer && <p className={styles.matchRelation}>{match.relation_path_to_viewer}</p>}
+          {rod && <p className={styles.matchRod}>{rod}</p>}
+          {relative.description && <p className={styles.matchDesc}>{relative.description}</p>}
+        </div>
+      )}
+
+      <button type="button" className={styles.whyBtn} onClick={() => setShowWhy((v) => !v)} aria-expanded={showWhy}>
+        <span className={`${styles.statusDot} ${styles[`st_${match.status}`] || ''}`} />
+        {STATUS_LABEL[match.status] ?? 'Совпадение'} — почему? {showWhy ? '▲' : '▼'}
+      </button>
+
+      {showWhy && (
+        <div className={styles.reason}>
+          <p className={styles.reasonLead}>
+            Найдена общая линия предков: {ev.chain_length ?? chain.length} совпад. подряд
+            {ev.sibling_confirmed ? '; подтверждено по родным братьям/сёстрам' : ''}.
+          </p>
+          {chain.length > 0 ? (
+            <ul className={styles.chain}>
+              {chain.map((c, i) => (
+                <li key={i} className={styles.chainRow}>
+                  <span className={styles.chainNames}>{c.person_a_name} ↔ {c.person_b_name}</span>
+                  <span className={styles.chainSignals}>
+                    имя {Math.round((c.name_similarity ?? 0) * 100)}%
+                    {c.geo_match ? ' · гео ✓' : ''}
+                    {c.ethnic_match ? ' · род ✓' : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.reasonLead}>Совпадение по имени и родовым/географическим признакам.</p>
+          )}
+        </div>
+      )}
+
+      <div className={styles.actions}>
+        <Button variant="accent" size="sm" onClick={() => onConfirm(match.id)}>Подтвердить</Button>
+        <Button variant="primary" size="sm" onClick={() => onReject(match.id)}>Отклонить</Button>
+      </div>
+    </li>
   )
 }
 

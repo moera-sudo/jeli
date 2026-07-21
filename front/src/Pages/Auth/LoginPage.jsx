@@ -6,7 +6,7 @@ import TextField from '../../UI/TextField/TextField'
 import Button from '../../UI/Button/Button'
 import { MailIcon, LockIcon, ArrowRightIcon } from '../../UI/icons'
 import { ROUTES } from '../../Routes/Routes'
-import { useAuth } from '../../auth/AuthContext'
+import { useAuth } from '../../utils/AuthContext'
 import { isValidEmail } from '../../utils/validation'
 import styles from './AuthForm.module.css'
 

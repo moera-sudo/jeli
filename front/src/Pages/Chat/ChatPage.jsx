@@ -8,7 +8,7 @@ import { ROUTES } from '../../Routes/Routes'
 import { listMessages, sendMessage, listChats } from '../../api/messengerService'
 import { getPublicProfile } from '../../api/profileService'
 import { uploadMedia, resolveMediaUrl } from '../../api/mediaService'
-import { useAuth } from '../../auth/AuthContext'
+import { useAuth } from '../../utils/AuthContext'
 import { formatPersonName } from '../../utils/fullName'
 import styles from './ChatPage.module.css'
 
