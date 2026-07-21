@@ -657,6 +657,8 @@
 .pickerList { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-3) 0; }
 .pickerItem { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2); border-radius: var(--radius-md); cursor: pointer; }
 .pickerItem:hover { background: #f4f4f5; }
+/* Orange (accent) radios for the successor / pick-a-person lists, not browser-blue. */
+.pickerItem input[type='radio'] { accent-color: var(--color-accent); }
 .pickerAvatar { width: 32px; height: 32px; border-radius: var(--radius-pill); object-fit: cover; }
 
 .codeBox {

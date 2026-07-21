@@ -122,9 +122,24 @@
 
 .searchAvatarFallback svg { width: 18px; height: 18px; }
 
-.searchName { flex: 1; min-width: 0; font-size: 0.92rem; font-weight: var(--font-weight-medium); color: var(--color-ink); }
+.searchBody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 
-.searchYear { flex-shrink: 0; font-size: 0.8rem; color: var(--color-muted); }
+.searchName {
+  font-size: 0.92rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.searchSub {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 
 /* ---------------------------------------------------------------- actions */
 .actions {

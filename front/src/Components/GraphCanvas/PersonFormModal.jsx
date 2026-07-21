@@ -34,6 +34,9 @@ export default function PersonFormModal({ title, initial = {}, submitLabel, onSu
     initial.birth_year_value != null ? String(initial.birth_year_value) : '',
   )
   const [isAlive, setIsAlive] = useState(initial.is_alive ?? true)
+  const [deathYear, setDeathYear] = useState(
+    initial.death_year_value != null ? String(initial.death_year_value) : '',
+  )
   const [avatar, setAvatar] = useState(initial.avatar_url ?? '')
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -80,6 +83,16 @@ export default function PersonFormModal({ title, initial = {}, submitLabel, onSu
       if (year) {
         values.birth_year_value = Number(year)
         values.birth_year_precision = 'exact'
+      }
+      // Death year only when deceased; toggling back to alive clears it.
+      if (!isAlive) {
+        const dyear = deathYear.trim()
+        if (dyear) {
+          values.death_year_value = Number(dyear)
+          values.death_year_precision = 'exact'
+        }
+      } else {
+        values.death_year_value = null
       }
       await onSubmit(values)
     } catch (err) {
@@ -175,6 +188,20 @@ export default function PersonFormModal({ title, initial = {}, submitLabel, onSu
             <input type="checkbox" checked={isAlive} onChange={(e) => setIsAlive(e.target.checked)} />
             <span>Жив(а)</span>
           </label>
+
+          {!isAlive && (
+            <label className={styles.formLabel}>
+              Год смерти
+              <input
+                className={styles.formInput}
+                type="number"
+                inputMode="numeric"
+                value={deathYear}
+                onChange={(e) => setDeathYear(e.target.value)}
+                placeholder="напр. 1998"
+              />
+            </label>
+          )}
 
           {error && <p className={styles.formError} role="alert">{error}</p>}
 

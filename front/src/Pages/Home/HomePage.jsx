@@ -31,9 +31,6 @@ export default function HomePage() {
   const [error, setError] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [matchesOpen, setMatchesOpen] = useState(false)
-  // Header-search state: people to search over + the picked target (id + nonce).
-  const [people, setPeople] = useState([])
-  const [searchFocus, setSearchFocus] = useState(null)
 
 
   useEffect(() => {
@@ -87,8 +84,6 @@ export default function HomePage() {
   return (
     <div className={styles.page}>
       <TopBar
-        searchPeople={people}
-        onSearchPick={(id) => setSearchFocus({ id, n: Date.now() })}
         historyActive={historyOpen}
         onToggleHistory={() => setHistoryOpen((v) => !v)}
         matchesActive={matchesOpen}
@@ -101,8 +96,6 @@ export default function HomePage() {
             isOwner={isAdmin}
             currentUserId={user?.id}
             onGraphChanged={reloadMe}
-            onPeopleLoaded={setPeople}
-            searchFocus={searchFocus}
           />
         </div>
         <HistoryPanel
@@ -176,11 +169,11 @@ function BlankHome({ onDone, onNeedGender, error }) {
               autoFocus
             />
             <div className={styles.blankActions}>
-              <Button variant="primary" onClick={() => { setMode(null); setCode(''); setLocalError('') }}>
-                Назад
-              </Button>
               <Button type="submit" variant="accent" trailingIcon={<ArrowRightIcon />} disabled={!isValidFamilyCode(code) || busy}>
                 {busy ? 'Присоединение…' : 'Присоединиться'}
+              </Button>
+               <Button variant="primary" onClick={() => { setMode(null); setCode(''); setLocalError('') }}>
+                Назад
               </Button>
             </div>
           </form>

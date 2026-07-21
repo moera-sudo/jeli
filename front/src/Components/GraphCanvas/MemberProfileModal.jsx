@@ -15,10 +15,11 @@ import styles from './GraphCanvas.module.css'
  *
  * @param {object} props
  * @param {string} props.userId        Linked user id of the registered person.
- * @param {() => void} props.onOpenChat
+ * @param {() => void} [props.onOpenChat]  Chat button (hidden when omitted).
+ * @param {() => void} [props.onRemove]    Remove-from-tree button (admin only; hidden when omitted).
  * @param {() => void} props.onClose
  */
-export default function MemberProfileModal({ userId, onOpenChat, onClose }) {
+export default function MemberProfileModal({ userId, onOpenChat, onRemove, onClose }) {
   const [profile, setProfile] = useState(null)
   const [error, setError] = useState('')
 
@@ -51,9 +52,20 @@ export default function MemberProfileModal({ userId, onOpenChat, onClose }) {
             gridClassName={styles.memberGrid}
             aboutTitle="О члене семьи"
             action={
-              <Button variant="primary" size="sm" trailingIcon={<ChatIcon />} onClick={onOpenChat}>
-                Открыть чат
-              </Button>
+              onOpenChat || onRemove ? (
+                <>
+                  {onOpenChat && (
+                    <Button variant="primary" size="sm" fullWidth trailingIcon={<ChatIcon />} onClick={onOpenChat}>
+                      Открыть чат
+                    </Button>
+                  )}
+                  {onRemove && (
+                    <Button variant="danger" size="sm" fullWidth onClick={onRemove}>
+                      Удалить
+                    </Button>
+                  )}
+                </>
+              ) : null
             }
           />
         )}

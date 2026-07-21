@@ -31,6 +31,7 @@ export default function RelationshipEdgeModal({ childName, links = [], onInsert,
   const [gender, setGender] = useState('')
   const [birthYear, setBirthYear] = useState('')
   const [isAlive, setIsAlive] = useState(true)
+  const [deathYear, setDeathYear] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -58,6 +59,11 @@ export default function RelationshipEdgeModal({ childName, links = [], onInsert,
     if (year) {
       values.birth_year_value = Number(year)
       values.birth_year_precision = 'exact'
+    }
+    const dyear = deathYear.trim()
+    if (!isAlive && dyear) {
+      values.death_year_value = Number(dyear)
+      values.death_year_precision = 'exact'
     }
     run(() => onInsert({ values, parentId }))
   }
@@ -159,6 +165,13 @@ export default function RelationshipEdgeModal({ childName, links = [], onInsert,
               <input type="checkbox" checked={isAlive} onChange={(e) => setIsAlive(e.target.checked)} />
               <span>Жив(а)</span>
             </label>
+
+            {!isAlive && (
+              <label className={styles.formLabel}>
+                Год смерти
+                <input className={styles.formInput} type="number" inputMode="numeric" value={deathYear} onChange={(e) => setDeathYear(e.target.value)} placeholder="напр. 1998" />
+              </label>
+            )}
 
             {error && <p className={styles.formError} role="alert">{error}</p>}
 

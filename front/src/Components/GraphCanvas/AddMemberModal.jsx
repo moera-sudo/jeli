@@ -50,6 +50,7 @@ export default function AddMemberModal({ targetName, people = [], onSubmit, onCl
   const [patronymic, setPatronymic] = useState('')
   const [birthYear, setBirthYear] = useState('')
   const [isAlive, setIsAlive] = useState(true)
+  const [deathYear, setDeathYear] = useState('')
 
   // Select-tab state.
   const [query, setQuery] = useState('')
@@ -88,6 +89,11 @@ export default function AddMemberModal({ targetName, people = [], onSubmit, onCl
         if (year) {
           values.birth_year_value = Number(year)
           values.birth_year_precision = 'exact'
+        }
+        const dyear = deathYear.trim()
+        if (!isAlive && dyear) {
+          values.death_year_value = Number(dyear)
+          values.death_year_precision = 'exact'
         }
         await onSubmit({ mode: 'create', role, values })
       } else {
@@ -171,6 +177,12 @@ export default function AddMemberModal({ targetName, people = [], onSubmit, onCl
                 <input type="checkbox" checked={isAlive} onChange={(e) => setIsAlive(e.target.checked)} />
                 <span>Жив(а)</span>
               </label>
+              {!isAlive && (
+                <label className={styles.formLabel}>
+                  Год смерти
+                  <input className={styles.formInput} type="number" inputMode="numeric" value={deathYear} onChange={(e) => setDeathYear(e.target.value)} placeholder="напр. 1998" />
+                </label>
+              )}
             </>
           ) : selectDisabled ? (
             <p className={styles.modalText}>

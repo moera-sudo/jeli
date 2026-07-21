@@ -1,68 +1,80 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 
-import { ROUTES } from '../../Routes/Routes'
+import { ROUTES, chatPath } from '../../Routes/Routes'
 import { SearchIcon, BellIcon, BookIcon, ChatIcon, UsersIcon, UserIcon } from '../../UI/icons'
 import NotificationsPanel from '../Notifications/NotificationsPanel'
+import MemberProfileModal from '../GraphCanvas/MemberProfileModal'
 import { listNotifications } from '../../api/notificationsService'
+import { searchProfiles } from '../../api/searchService'
+import { createChat } from '../../api/messengerService'
 import { useAuth } from '../../auth/AuthContext'
 import { resolveMediaUrl } from '../../api/mediaService'
 import { formatPersonName } from '../../utils/fullName'
 import logo from '../../assets/logo_2.png'
 import styles from './TopBar.module.css'
 
-// Fields the tree search matches against — everything the graph node carries
-// (name parts + birth/death year). Geo/ethnic fields aren't in the graph payload.
-function personHaystack(p) {
-  return [formatPersonName(p, ''), p.birth_year, p.death_year].filter(Boolean).join(' ').toLowerCase()
-}
-
 /**
- * Global application header: brand mark, a central search field, and the
+ * Global application header: brand mark, a platform-wide people search, and the
  * right-hand cluster of actions (family history, notifications, account).
  *
- * The search bar filters the loaded family tree (when `searchPeople` is given)
- * and reports the chosen person via `onSearchPick`; the history toggle only
- * renders when `onToggleHistory` is supplied, so other screens stay unchanged.
- *
- * @param {object}   props
- * @param {string}   [props.searchPlaceholder]  Placeholder for the search field.
- * @param {Array}    [props.searchPeople]       People to search (graph nodes).
- * @param {(id: string) => void} [props.onSearchPick]  Called with the picked person id.
- * @param {boolean}  [props.historyActive]      Whether the history panel is open.
- * @param {() => void} [props.onToggleHistory]  Toggles the history panel.
+ * The search queries EVERY registered user across all trees by name (backend
+ * `/search`); clicking a result opens that person's public profile (with a chat
+ * button when they have a tree node). The history toggle only renders when
+ * `onToggleHistory` is supplied, so other screens stay unchanged.
  */
 export default function TopBar({
-  searchPlaceholder = 'Поиск по дереву — имя, фамилия, отчество, год…',
-  searchPeople = [],
-  onSearchPick,
+  searchPlaceholder = 'Поиск людей по имени — по всей платформе…',
   historyActive = false,
   onToggleHistory,
   matchesActive = false,
   onToggleMatches,
 }) {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+
+  /* ------------------------------------------------------ platform search */
   const [query, setQuery] = useState('')
   const [searchFocused, setSearchFocused] = useState(false)
+  const [results, setResults] = useState([])
+  const [searching, setSearching] = useState(false)
+  const [selected, setSelected] = useState(null) // clicked UserPublic → profile modal
 
-  const searchable = searchPeople.length > 0
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q || !searchable) return []
-    return searchPeople
-      .filter((p) => personHaystack(p).includes(q))
-      .slice(0, 8)
-  }, [query, searchPeople, searchable])
+  // Debounced platform-wide search (by name) whenever the query changes.
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) { setResults([]); setSearching(false); return }
+    setSearching(true)
+    const timer = setTimeout(async () => {
+      try {
+        setResults(await searchProfiles(q))
+      } catch {
+        setResults([])
+      } finally {
+        setSearching(false)
+      }
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [query])
 
-  const pickResult = (id) => {
-    onSearchPick?.(id)
-    setQuery('')
+  const openProfile = (u) => {
+    setSelected(u)
     setSearchFocused(false)
   }
 
-  const showDrop = searchFocused && searchable
+  // Chat is only possible if the found user already has a tree node (person_id).
+  const openChatWith = async (u) => {
+    if (!u?.person_id) return
+    try {
+      const chat = await createChat(u.person_id)
+      setSelected(null)
+      navigate(chatPath(chat.id))
+    } catch { /* surfaced elsewhere; keep the modal open */ }
+  }
+
   const q = query.trim()
+  const showDrop = searchFocused
   // Whether the server still has unread notifications — drives the dot. Derived
   // from the backend (not local state) so it survives a page reload.
   const [hasUnread, setHasUnread] = useState(false)
@@ -102,12 +114,11 @@ export default function TopBar({
           type="search"
           className={styles.searchInput}
           placeholder={searchPlaceholder}
-          aria-label="Поиск по дереву"
+          aria-label="Поиск людей"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setSearchFocused(true)}
           onBlur={() => setSearchFocused(false)}
-          disabled={!searchable}
         />
 
         {showDrop && (
@@ -115,30 +126,45 @@ export default function TopBar({
           <div className={styles.searchDrop} onMouseDown={(e) => e.preventDefault()}>
             {!q ? (
               <p className={styles.searchHint}>
-                Искать можно по имени, фамилии, отчеству или году рождения — по всем родственникам в дереве.
+                Ищите людей по всей платформе — по фамилии, имени или отчеству. Найдёте — откроете профиль и сможете написать.
               </p>
+            ) : searching ? (
+              <p className={styles.searchHint}>Поиск…</p>
             ) : results.length === 0 ? (
               <p className={styles.searchHint}>Никого не найдено по запросу «{q}».</p>
             ) : (
               <ul className={styles.searchList}>
-                {results.map((p) => (
-                  <li key={p.id}>
-                    <button type="button" className={styles.searchItem} onClick={() => pickResult(p.id)}>
-                      {p.avatar_url ? (
-                        <img className={styles.searchAvatar} src={resolveMediaUrl(p.avatar_url)} alt="" />
-                      ) : (
-                        <span className={styles.searchAvatarFallback} aria-hidden="true"><UserIcon /></span>
-                      )}
-                      <span className={styles.searchName}>{formatPersonName(p, 'Без имени')}</span>
-                      {p.birth_year && <span className={styles.searchYear}>{p.birth_year}</span>}
-                    </button>
-                  </li>
-                ))}
+                {results.map((p) => {
+                  const place = [p.current_city, p.current_country].filter(Boolean).join(', ')
+                  return (
+                    <li key={p.id}>
+                      <button type="button" className={styles.searchItem} onClick={() => openProfile(p)}>
+                        {p.avatar_url ? (
+                          <img className={styles.searchAvatar} src={resolveMediaUrl(p.avatar_url)} alt="" />
+                        ) : (
+                          <span className={styles.searchAvatarFallback} aria-hidden="true"><UserIcon /></span>
+                        )}
+                        <span className={styles.searchBody}>
+                          <span className={styles.searchName}>{formatPersonName(p, 'Без имени')}</span>
+                          {place && <span className={styles.searchSub}>{place}</span>}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>
         )}
       </div>
+
+      {selected && (
+        <MemberProfileModal
+          userId={selected.id}
+          onOpenChat={selected.person_id ? () => openChatWith(selected) : undefined}
+          onClose={() => setSelected(null)}
+        />
+      )}
 
       <div className={styles.actions}>
         {onToggleMatches && (

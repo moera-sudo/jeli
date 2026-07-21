@@ -146,9 +146,13 @@ export default function PersonProfileModal({
                   <Button variant="primary" size="sm" trailingIcon={<EditIcon />} onClick={onEdit}>
                     Изменить
                   </Button>
-                  <Button variant="danger" size="sm" onClick={onRemove}>
-                    Удалить
-                  </Button>
+                  {/* Only the graph admin (owner) may remove a family member — not
+                      collaborators or the person themselves. */}
+                  {isOwner && (
+                    <Button variant="danger" size="sm" onClick={onRemove}>
+                      Удалить
+                    </Button>
+                  )}
                 </div>
               </>
             )}

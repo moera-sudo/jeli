@@ -8,7 +8,7 @@ import Button from '../../UI/Button/Button'
 import Loader from '../../UI/Loader/Loader'
 import { EditIcon, MailIcon, CloseIcon } from '../../UI/icons'
 import { getMyProfile, updateProfile, deleteAccount } from '../../api/profileService'
-import { getSuccessorCandidates } from '../../api/graphService'
+import { getSuccessorCandidates, getMyPerson, deletePerson } from '../../api/graphService'
 import { useAuth } from '../../auth/AuthContext'
 import { ROUTES } from '../../Routes/Routes'
 import { formatPersonName } from '../../utils/fullName'
@@ -49,8 +49,11 @@ export default function Profile() {
 
   const [editing, setEditing] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [myPerson, setMyPerson] = useState(null) // the viewer's own graph node (or null)
 
-  // Account deletion: null → confirm dialog → (if sole owner) successor picker.
+  // Removal flow — same confirm/successor dialogs serve two operations:
+  //  'account' → delete the whole account; 'tree' → just unlink from the tree.
+  const [deleteMode, setDeleteMode] = useState('account')
   const [deleteStep, setDeleteStep] = useState(null) // null | 'confirm' | 'successor'
   const [successors, setSuccessors] = useState([])
   const [pickedSuccessor, setPickedSuccessor] = useState('')
@@ -63,6 +66,9 @@ export default function Profile() {
     getMyProfile()
       .then((me) => active && setUser(me))
       .catch((err) => active && setLoadError(err.message || 'Не удалось загрузить профиль'))
+    getMyPerson()
+      .then((p) => active && setMyPerson(p))
+      .catch(() => { /* no node / not in a tree — the leave button just won't show */ })
     return () => {
       active = false
     }
@@ -78,21 +84,27 @@ export default function Profile() {
     setEditing(false)
   }
 
-  const openDelete = () => {
+  const openDelete = (mode) => {
+    setDeleteMode(mode)
     setDeleteError('')
     setPickedSuccessor('')
     setDeleteStep('confirm')
   }
 
-  // Runs the deletion. If the server needs a successor (409), switch to the
-  // picker and retry with the chosen owner.
+  // Runs the chosen operation. If the server needs a successor (409, sole owner
+  // with other members), switch to the picker and retry with the chosen owner.
   const runDelete = async (newOwnerUserId) => {
     setDeleteError('')
     setDeleting(true)
     try {
-      await deleteAccount(newOwnerUserId)
-      logout()
-      navigate(ROUTES.login, { replace: true })
+      if (deleteMode === 'account') {
+        await deleteAccount(newOwnerUserId)
+        logout()
+        navigate(ROUTES.login, { replace: true })
+      } else {
+        await deletePerson(myPerson.id, newOwnerUserId)
+        navigate(ROUTES.home, { replace: true }) // now tree-less → the join/create screen
+      }
     } catch (err) {
       if (err.status === 409 && !newOwnerUserId) {
         try {
@@ -105,7 +117,7 @@ export default function Profile() {
           }
         } catch { /* fall through to the generic error */ }
       }
-      setDeleteError(err.message || 'Не удалось удалить аккаунт')
+      setDeleteError(err.message || (deleteMode === 'account' ? 'Не удалось удалить аккаунт' : 'Не удалось покинуть дерево'))
     } finally {
       setDeleting(false)
     }
@@ -149,7 +161,14 @@ export default function Profile() {
                   >
                     Выйти
                   </Button>
-                  <Button variant="primary" size="sm" onClick={openDelete}>
+                  {/* Leave the tree (unlink your node, keep the account). For a graph
+                      admin this hands ownership to a successor. */}
+                  {myPerson && (
+                    <Button variant="danger" size="sm" onClick={() => openDelete('tree')}>
+                      Покинуть дерево
+                    </Button>
+                  )}
+                  <Button variant="primary" size="sm" onClick={() => openDelete('account')}>
                     Удалить аккаунт
                   </Button>
                 </div>
@@ -160,15 +179,20 @@ export default function Profile() {
       </main>
 
       {deleteStep === 'confirm' && (
-        <DeleteModal title="Удалить аккаунт" onClose={() => setDeleteStep(null)}>
+        <DeleteModal
+          title={deleteMode === 'account' ? 'Удалить аккаунт' : 'Покинуть дерево'}
+          onClose={() => setDeleteStep(null)}
+        >
           <p className={styles.modalText}>
-            Аккаунт и профиль будут удалены безвозвратно. Ваш узел в чужом дереве просто отвяжется, данные в нём сохранятся.
+            {deleteMode === 'account'
+              ? 'Аккаунт и профиль будут удалены безвозвратно. Ваш узел в чужом дереве просто отвяжется, данные в нём сохранятся.'
+              : 'Ваш аккаунт отвяжется от узла в дереве (сам узел и его данные сохранятся). Аккаунт останется — вы сможете создать или присоединиться к другому дереву.'}
           </p>
           {deleteError && <p className={styles.notice} role="alert">{deleteError}</p>}
           <div className={styles.modalActions}>
             <Button variant="primary" size="sm" onClick={() => setDeleteStep(null)}>Отмена</Button>
             <Button variant="accent" size="sm" disabled={deleting} onClick={() => runDelete()}>
-              {deleting ? 'Удаление…' : 'Удалить'}
+              {deleting ? 'Выполняется…' : deleteMode === 'account' ? 'Удалить' : 'Покинуть'}
             </Button>
           </div>
         </DeleteModal>
@@ -199,7 +223,7 @@ export default function Profile() {
           <div className={styles.modalActions}>
             <Button variant="primary" size="sm" onClick={() => setDeleteStep(null)}>Отмена</Button>
             <Button variant="accent" size="sm" disabled={deleting || !pickedSuccessor} onClick={() => runDelete(pickedSuccessor)}>
-              {deleting ? 'Удаление…' : 'Передать и удалить'}
+              {deleting ? 'Выполняется…' : deleteMode === 'account' ? 'Передать и удалить' : 'Передать и покинуть'}
             </Button>
           </div>
         </DeleteModal>
