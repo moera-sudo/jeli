@@ -1,0 +1,158 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(26, 26, 26, 0.28);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.backdropOpen { opacity: 1; visibility: visible; }
+
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  width: min(400px, 92vw);
+  height: 100dvh;
+  background: var(--color-base);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -20px 0 50px -24px rgba(26, 26, 26, 0.35);
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+}
+
+.open { transform: translateX(0); }
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+}
+
+.title { font-size: 1.2rem; font-weight: var(--font-weight-bold); }
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--color-muted);
+  border-radius: var(--radius-pill);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.close:hover { background: #f4f4f5; color: var(--color-ink); }
+.close svg { width: 18px; height: 18px; }
+
+/* --------------------------------------------------------------- tabs */
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+  padding: 0 var(--space-5) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-muted);
+  border-radius: var(--radius-md);
+  transition: background 0.15s ease, color 0.15s ease;
+  cursor: pointer;
+}
+
+/* Idle-tab hover only — the active tab keeps its dark fill so its light text
+   never blends into a light hover background. */
+.tab:not(.tabActive):hover { background: #f4f4f5; color: var(--color-ink); }
+
+.tabActive { color: var(--color-base); background: var(--color-ink); }
+
+.tabActive:hover { color: var(--color-base); background: var(--color-ink); opacity: 0.9; }
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-base);
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+}
+
+.tabActive .count { background: var(--color-accent); }
+
+/* --------------------------------------------------------------- body */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3) 0;
+}
+
+.error {
+  margin: 0 var(--space-5) var(--space-3);
+  font-size: 0.83rem;
+  color: var(--color-danger);
+}
+
+.groupLabel {
+  padding: var(--space-3) var(--space-5) 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+
+.list { list-style: none; }
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.itemBody { min-width: 0; }
+.itemTitle { font-size: 0.92rem; font-weight: var(--font-weight-bold); color: var(--color-ink); }
+.itemText { margin-top: 2px; font-size: 0.85rem; line-height: 1.45; color: var(--color-muted); }
+
+.score {
+  display: inline-block;
+  margin-top: var(--space-2);
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-accent);
+}
+
+.actions { display: flex; gap: var(--space-2); }
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-7, 48px) var(--space-5);
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.empty svg { width: 40px; height: 40px; opacity: 0.5; }
+.empty p { font-size: 0.95rem; font-weight: var(--font-weight-medium); color: var(--color-ink); }
+.empty span { font-size: 0.83rem; line-height: 1.5; }

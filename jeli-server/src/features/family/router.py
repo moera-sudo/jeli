@@ -16,14 +16,19 @@ router = APIRouter(prefix="/family", tags=["family"])
 @router.get(
     "",
     response_model=FamilyRead,
-    summary="Получить свою историю семьи",
-    description="Markdown-история и заголовок текущего пользователя. 404, если ещё не создана — используйте PUT /family.",
+    summary="Получить общую историю своей семьи",
+    description=(
+        "Одна общая markdown-история на весь граф (ключ — владелец графа). Возвращает историю графа, "
+        "к которому принадлежит текущий пользователь (определяется по его узлу). Её видят и правят все "
+        "члены семьи. 404, если ещё не создана — используйте PUT /family."
+    ),
 )
 async def get_my_family(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),
 ) -> FamilyRead:
-    family = await family_service.get_family_or_404(db, current_user.id)
+    owner_user_id = await family_service.resolve_graph_owner_id(db, current_user)
+    family = await family_service.get_family_or_404(db, owner_user_id)
     return FamilyRead.model_validate(family)
 
 
@@ -45,11 +50,13 @@ async def get_family(
 @router.put(
     "",
     response_model=FamilyRead,
-    summary="Создать или полностью обновить историю семьи",
+    summary="Создать или полностью обновить общую историю семьи",
     description=(
-        "Ресурс всегда единственный на владельца графа — создаёт запись, если её ещё нет, иначе "
-        "полностью перезаписывает title и content. Фото вставляются в content как markdown-ссылки "
-        "на /api/media/{id}, полученные через POST /media."
+        "Ресурс единственный на весь граф (ключ — владелец графа). ЛЮБОЙ член семьи, принадлежащий "
+        "графу, редактирует одну и ту же общую историю — правка пишется под владельца графа, а не под "
+        "автора правки, поэтому итог виден всем. Создаёт запись, если её ещё нет, иначе полностью "
+        "перезаписывает title и content. Фото вставляются в content как markdown-ссылки на "
+        "/api/media/{id}, полученные через POST /media."
     ),
 )
 async def upsert_family(

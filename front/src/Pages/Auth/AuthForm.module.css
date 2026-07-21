@@ -1,0 +1,42 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.actions {
+  margin-top: var(--space-2);
+}
+
+/* Whole-form error message (e.g. bad credentials, email already taken). */
+.formError {
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.85rem;
+  color: var(--color-danger);
+  background: rgba(220, 53, 69, 0.08);
+  border: 1px solid rgba(220, 53, 69, 0.2);
+  border-radius: var(--radius-md);
+}
+
+/* "Do you already have a family?" prompt. */
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-left: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--color-ink);
+  cursor: pointer;
+}
+
+.checkboxLabel {
+  font-size: 0.9rem;
+  color: var(--color-ink);
+}

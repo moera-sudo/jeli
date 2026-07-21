@@ -1,0 +1,188 @@
+.page {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--color-base);
+}
+
+.aside {
+  display: none;
+  padding: var(--space-4);
+  background: var(--color-base);
+}
+
+.frame {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  padding: var(--space-7);
+  color: var(--color-base);
+  background: var(--gradient-accent);
+  border-radius: var(--radius-lg);
+}
+
+/* Two soft blobs drifting on opposite paths make the movement clearly
+   visible while staying gentle. Transform-only animation keeps it on the
+   GPU compositor, so it's cheap despite the larger travel. */
+.frame::before,
+.frame::after {
+  content: '';
+  position: absolute;
+  inset: -60%;
+  z-index: 0;
+  will-change: transform;
+}
+
+/* Bright highlight blob. */
+.frame::before {
+  background: radial-gradient(
+    38% 38% at 32% 32%,
+    var(--color-accent-soft) 0%,
+    transparent 62%
+  );
+  opacity: 0.85;
+  animation: driftA 16s ease-in-out infinite alternate;
+}
+
+/* Deeper warm blob moving the other way for contrast. */
+.frame::after {
+  background: radial-gradient(
+    42% 42% at 68% 70%,
+    #e85c2b 0%,
+    transparent 60%
+  );
+  opacity: 0.6;
+  animation: driftB 20s ease-in-out infinite alternate;
+}
+
+@keyframes driftA {
+  from {
+    transform: translate3d(-18%, -12%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(22%, 16%, 0) scale(1.35);
+  }
+}
+
+@keyframes driftB {
+  from {
+    transform: translate3d(20%, 14%, 0) scale(1.2);
+  }
+  to {
+    transform: translate3d(-16%, -18%, 0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame::before,
+  .frame::after {
+    animation: none;
+  }
+}
+
+.asideContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.brand {
+  height: 100px;
+  width: 100px;
+}
+
+.asideHeading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  /* Lift the heading up off the bottom, toward the vertical centre. */
+  margin-bottom: 15vh;
+}
+
+.asideEyebrow {
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-medium);
+}
+
+.tagline {
+  max-width: 20ch;
+  font-size: clamp(1.75rem, 3vw, 3.25rem);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+}
+
+/* Soft blurred blob for depth, echoing the design reference. */
+.blob {
+  position: absolute;
+  width: 60%;
+  aspect-ratio: 1;
+  right: -10%;
+  bottom: -15%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.55), transparent 65%);
+  filter: blur(10px);
+}
+
+/* Right side — the form column. */
+.main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  background: var(--color-base);
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  padding: clamp(var(--space-5), 10vw, var(--space-6));
+  background: var(--color-base);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.eyebrow {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.title {
+  font-size: clamp(1.75rem, 5vw, 2.25rem);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+}
+
+.switchHint {
+  margin-top: var(--space-5);
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  text-align: center;
+}
+
+.switchLink {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+.switchLink:hover {
+  text-decoration: underline;
+}
+
+@media (min-width: 900px) {
+  .page {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .aside {
+    display: block;
+  }
+}

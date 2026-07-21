@@ -1,0 +1,160 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
+import AuthLayout from '../../Components/AuthLayout/AuthLayout'
+import NameFields from '../../Components/NameFields/NameFields'
+import TextField from '../../UI/TextField/TextField'
+import Button from '../../UI/Button/Button'
+import { MailIcon, LockIcon, UsersIcon, ArrowRightIcon } from '../../UI/icons'
+import { ROUTES } from '../../Routes/Routes'
+import { useAuth } from '../../auth/AuthContext'
+import { isValidEmail, isValidPassword, isValidFamilyCode, normalizeInviteCode } from '../../utils/validation'
+import styles from './AuthForm.module.css'
+
+export default function RegisterPage() {
+  const navigate = useNavigate()
+  const { register } = useAuth()
+
+  const [name, setName] = useState({ surname: '', firstName: '', middleName: '' })
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [hasFamily, setHasFamily] = useState(false)
+  const [familyCode, setFamilyCode] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  const emailInvalid = email.length > 0 && !isValidEmail(email)
+  const passwordInvalid = password.length > 0 && !isValidPassword(password)
+  const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== password
+  const codeInvalid = hasFamily && familyCode.length > 0 && !isValidFamilyCode(familyCode)
+  const nameValid = name.surname.trim().length > 0 && name.firstName.trim().length > 0
+  const handleNameChange = (field, value) => setName((prev) => ({ ...prev, [field]: value }))
+
+  const canSubmit =
+    nameValid &&
+    isValidEmail(email) &&
+    isValidPassword(password) &&
+    confirmPassword === password &&
+    (!hasFamily || isValidFamilyCode(familyCode)) &&
+    !submitting
+
+  const handleCodeChange = (event) =>
+    setFamilyCode(normalizeInviteCode(event.target.value))
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    if (!canSubmit) return
+
+    setFormError('')
+    setSubmitting(true)
+    try {
+      await register({
+        last_name: name.surname.trim(),
+        first_name: name.firstName.trim(),
+        patronymic: name.middleName.trim() || null,
+        email: email.trim(),
+        password,
+        graph_invite_code: hasFamily ? familyCode : null,
+      })
+      navigate(ROUTES.onboarding, { replace: true })
+    } catch (err) {
+      setFormError(err.message || 'Не удалось зарегистрироваться')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <AuthLayout
+      title="Регистрация"
+      subtitle="Создайте аккаунт, чтобы начать строить своё древо."
+      switchTo={{ hint: 'Уже есть аккаунт?', label: 'Войти', to: ROUTES.login }}
+    >
+      <form className={styles.form} onSubmit={handleSubmit} noValidate>
+        <NameFields values={name} onChange={handleNameChange} withIcons />
+
+        <TextField
+          label="Электронная почта"
+          type="email"
+          name="email"
+          placeholder="адрес e-mail"
+          autoComplete="email"
+          icon={<MailIcon />}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={emailInvalid ? 'Введите корректный адрес эл. почты' : undefined}
+        />
+
+        <TextField
+          label="Пароль"
+          type="password"
+          name="password"
+          placeholder="пароль"
+          autoComplete="new-password"
+          icon={<LockIcon />}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={passwordInvalid ? 'Минимум 8 символов' : undefined}
+        />
+
+        <TextField
+          label="Повторите пароль"
+          type="password"
+          name="confirmPassword"
+          placeholder="повторите пароль"
+          autoComplete="new-password"
+          icon={<LockIcon />}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          error={passwordsMismatch ? 'Пароли не совпадают' : undefined}
+        />
+
+        <label className={styles.checkboxRow}>
+          <input
+            type="checkbox"
+            className={styles.checkbox}
+            checked={hasFamily}
+            onChange={(e) => {
+              setHasFamily(e.target.checked)
+              if (!e.target.checked) setFamilyCode('')
+            }}
+          />
+          <span className={styles.checkboxLabel}>У вас уже есть семья на платформе?</span>
+        </label>
+
+        {hasFamily && (
+          <TextField
+            label="Код приглашения"
+            type="text"
+            name="familyCode"
+            placeholder="8-значный код, напр. AB3D7K9M"
+            autoCapitalize="characters"
+            autoComplete="off"
+            icon={<UsersIcon />}
+            value={familyCode}
+            onChange={handleCodeChange}
+            error={codeInvalid ? 'Код состоит из 8 символов (буквы и цифры)' : undefined}
+          />
+        )}
+
+        {formError && (
+          <p className={styles.formError} role="alert">
+            {formError}
+          </p>
+        )}
+
+        <div className={styles.actions}>
+          <Button
+            type="submit"
+            variant="accent"
+            fullWidth
+            trailingIcon={<ArrowRightIcon />}
+            disabled={!canSubmit}
+          >
+            {submitting ? 'Создание…' : 'Создать аккаунт'}
+          </Button>
+        </div>
+      </form>
+    </AuthLayout>
+  )
+}
