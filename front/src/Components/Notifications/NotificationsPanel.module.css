@@ -87,6 +87,29 @@
   padding: var(--space-2) 0;
 }
 
+/* Row wrapper so the delete button can sit over the clickable item. */
+.itemWrap { position: relative; }
+
+.itemDelete {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-muted);
+  border-radius: var(--radius-pill);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.itemWrap:hover .itemDelete { opacity: 1; }
+.itemDelete:hover { background: rgba(220, 53, 69, 0.1); color: var(--color-danger); }
+.itemDelete svg { width: 15px; height: 15px; }
+
 .item {
   position: relative;
   display: flex;

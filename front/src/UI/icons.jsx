@@ -29,6 +29,7 @@ export {
   LuDownload as DownloadIcon,
   LuBookOpen as BookIcon,
   LuX as CloseIcon,
+  LuTrash2 as TrashIcon,
   LuBold as BoldIcon,
   LuItalic as ItalicIcon,
   LuHeading as HeadingIcon,

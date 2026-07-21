@@ -647,6 +647,8 @@
 .pickerIcon svg { width: 18px; height: 18px; }
 
 .checkboxRow { display: inline-flex; align-items: center; gap: var(--space-2); font-size: 0.9rem; }
+/* Black-and-white checkbox (no browser-blue accent). */
+.checkboxRow input[type='checkbox'] { accent-color: var(--color-ink); }
 
 .formError { font-size: 0.83rem; color: var(--color-danger); }
 

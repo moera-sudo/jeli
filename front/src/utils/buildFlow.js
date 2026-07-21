@@ -33,12 +33,79 @@ const avg = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
  * @param {object} graph  GraphResponse { focus_person_id, persons, relationships }.
  * @returns {{ nodes: Array, edges: Array }}
  */
+// Split people into connected components (child_of + spouse_of + match all
+// connect). Deleting a link can break the owner's graph into separate pieces.
+function connectedComponents(persons, relationships) {
+  const adj = new Map(persons.map((p) => [p.id, []]));
+  for (const r of relationships) {
+    if (adj.has(r.from_person_id) && adj.has(r.to_person_id)) {
+      adj.get(r.from_person_id).push(r.to_person_id);
+      adj.get(r.to_person_id).push(r.from_person_id);
+    }
+  }
+  const seen = new Set();
+  const comps = [];
+  for (const p of persons) {
+    if (seen.has(p.id)) continue;
+    const ids = new Set();
+    const stack = [p.id];
+    while (stack.length) {
+      const id = stack.pop();
+      if (seen.has(id)) continue;
+      seen.add(id);
+      ids.add(id);
+      for (const nb of adj.get(id) ?? []) if (!seen.has(nb)) stack.push(nb);
+    }
+    comps.push({ ids, persons: persons.filter((pp) => ids.has(pp.id)) });
+  }
+  return comps;
+}
+
+/**
+ * @param {object} graph  GraphResponse { focus_person_id, persons, relationships }.
+ * @returns {{ nodes: Array, edges: Array }}
+ *
+ * Lays out EACH connected component on its own, then sets them side by side (the
+ * focus's component first). A family detached by a deleted link stays a coherent,
+ * visible cluster instead of being scattered into the main tree's rows.
+ */
 export function buildFlow(graph) {
   const persons = graph?.persons ?? [];
   const relationships = graph?.relationships ?? [];
   const focusId = graph?.focus_person_id;
   if (!persons.length) return { nodes: [], edges: [] };
 
+  // Rows align by generation ACROSS components (global reference), so a gen-0
+  // person in one cluster sits on the same row as gen-0 in another.
+  const globalMaxGen = Math.max(...persons.map((p) => p.generation ?? 0));
+  const components = connectedComponents(persons, relationships);
+  // Focus component first so the initial centring lands on the main tree.
+  components.sort((a, b) => (b.ids.has(focusId) ? 1 : 0) - (a.ids.has(focusId) ? 1 : 0));
+
+  const nodes = [];
+  const edges = [];
+  const COMPONENT_GAP = 200;
+  let xOffset = 0;
+  for (const comp of components) {
+    const compRels = relationships.filter((r) => comp.ids.has(r.from_person_id) && comp.ids.has(r.to_person_id));
+    const flow = layoutComponent(comp.persons, compRels, focusId, globalMaxGen);
+    if (!flow.nodes.length) continue;
+    const minX = Math.min(...flow.nodes.map((n) => n.position.x));
+    const maxRight = Math.max(
+      ...flow.nodes.map((n) => n.position.x + (n.type === 'union' ? UNION_SIZE.width : NODE_SIZE.width)),
+    );
+    const shift = xOffset - minX;
+    for (const n of flow.nodes) {
+      n.position = { x: n.position.x + shift, y: n.position.y };
+      nodes.push(n);
+    }
+    for (const e of flow.edges) edges.push(e);
+    xOffset += (maxRight - minX) + COMPONENT_GAP;
+  }
+  return { nodes, edges };
+}
+
+function layoutComponent(persons, relationships, focusId, globalMaxGen) {
   const personById = new Map(persons.map((p) => [p.id, p]));
 
   /* ----------------------------------------------------- kinship indexes --- */
@@ -209,8 +276,7 @@ export function buildFlow(graph) {
   }
 
   /* ---------------------------------------------------------- RF nodes ---- */
-  const maxGen = rowGens[0] ?? 0;
-  const rowY = (gen) => (maxGen - gen) * ROW_GAP; // higher generation → top
+  const rowY = (gen) => (globalMaxGen - gen) * ROW_GAP; // higher generation → top (aligned across components)
   const spouseSpan = NODE_SIZE.width + INNER_GAP; // centre-to-centre of the two cards
 
   const nodes = [];

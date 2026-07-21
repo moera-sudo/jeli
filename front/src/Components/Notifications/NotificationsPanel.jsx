@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { CloseIcon, UsersIcon, BellIcon, ChatIcon } from '../../UI/icons'
-import { listNotifications, markAllNotificationsRead } from '../../api/notificationsService'
+import { CloseIcon, UsersIcon, BellIcon, ChatIcon, TrashIcon } from '../../UI/icons'
+import { listNotifications, markAllNotificationsRead, deleteNotification } from '../../api/notificationsService'
 import { ROUTES, chatPath } from '../../Routes/Routes'
 import styles from './NotificationsPanel.module.css'
 
@@ -114,6 +114,15 @@ export default function NotificationsPanel({ open, onClose }) {
     if (nav?.to) navigate(nav.to, nav.state ? { state: nav.state } : undefined)
   }
 
+  const handleDelete = async (id) => {
+    setItems((prev) => prev.filter((n) => n.id !== id)) // optimistic
+    try {
+      await deleteNotification(id)
+    } catch {
+      load() // restore on failure
+    }
+  }
+
   return (
     <>
       <div
@@ -142,7 +151,7 @@ export default function NotificationsPanel({ open, onClose }) {
             {items.map((n) => {
               const d = describe(n)
               return (
-                <li key={n.id}>
+                <li key={n.id} className={styles.itemWrap}>
                   <button
                     type="button"
                     className={`${styles.item} ${n.is_read ? '' : styles.unread}`}
@@ -157,6 +166,14 @@ export default function NotificationsPanel({ open, onClose }) {
                       {d.text && <p className={styles.itemText}>{d.text}</p>}
                       <span className={styles.itemTime}>{formatTime(n.created_at)}</span>
                     </div>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.itemDelete}
+                    aria-label="Удалить уведомление"
+                    onClick={() => handleDelete(n.id)}
+                  >
+                    <TrashIcon />
                   </button>
                 </li>
               )

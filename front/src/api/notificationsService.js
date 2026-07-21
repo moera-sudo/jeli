@@ -42,3 +42,14 @@ export async function markNotificationRead(id) {
 export async function markAllNotificationsRead() {
   await api.post('/notifications/read-all');
 }
+
+/**
+ * Delete a single notification.
+ * DELETE /notifications/{id}
+ *
+ * @param {string} id
+ * @returns {Promise<void>}
+ */
+export async function deleteNotification(id) {
+  await api.delete(`/notifications/${id}`);
+}

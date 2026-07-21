@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom'
 
 import TopBar from '../../Components/TopBar/TopBar'
 import Loader from '../../UI/Loader/Loader'
-import { SearchIcon, UserIcon } from '../../UI/icons'
+import { SearchIcon, UserIcon, TrashIcon } from '../../UI/icons'
 import { chatPath } from '../../Routes/Routes'
-import { listChats } from '../../api/messengerService'
+import { listChats, deleteChat } from '../../api/messengerService'
 import { getPublicProfile } from '../../api/profileService'
 import { resolveMediaUrl } from '../../api/mediaService'
 import { formatPersonName } from '../../utils/fullName'
@@ -50,6 +50,9 @@ export default function ChatsPage() {
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
     return (chats ?? [])
+      // Only show conversations that actually have messages — empty (just-opened)
+      // chats aren't kept in the list.
+      .filter((c) => c.last_message)
       .map((c) => ({
         id: c.id,
         name: formatPersonName(peers[c.peer_user_id], 'Родственник'),
@@ -59,6 +62,17 @@ export default function ChatsPage() {
       }))
       .filter((r) => r.name.toLowerCase().includes(q))
   }, [chats, peers, query])
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Удалить чат и всю переписку? Это действие необратимо.')) return
+    setChats((prev) => (prev ?? []).filter((c) => c.id !== id)) // optimistic
+    try {
+      await deleteChat(id)
+    } catch {
+      const list = await listChats().catch(() => null)
+      if (list) setChats(list)
+    }
+  }
 
   return (
     <div className={styles.page}>
@@ -88,7 +102,7 @@ export default function ChatsPage() {
         ) : (
           <ul className={styles.list}>
             {rows.map((chat) => (
-              <li key={chat.id}>
+              <li key={chat.id} className={styles.rowWrap}>
                 <Link to={chatPath(chat.id)} className={styles.row}>
                   {chat.avatar ? (
                     <img className={styles.avatar} src={chat.avatar} alt="" />
@@ -103,6 +117,14 @@ export default function ChatsPage() {
                     <span className={styles.time}>{chat.time}</span>
                   </span>
                 </Link>
+                <button
+                  type="button"
+                  className={styles.deleteBtn}
+                  aria-label="Удалить чат"
+                  onClick={() => handleDelete(chat.id)}
+                >
+                  <TrashIcon />
+                </button>
               </li>
             ))}
           </ul>

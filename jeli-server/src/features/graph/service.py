@@ -389,9 +389,30 @@ async def get_bloodline(db: AsyncSession, person_id: uuid.UUID, current_user: Us
     return GraphResponse(focus_person_id=focus.id, persons=persons, relationships=list(edges.values()))
 
 
+async def _graph_owner_person_ids(db: AsyncSession, owner_user_id: uuid.UUID) -> set[uuid.UUID]:
+    # * Все узлы графа данного владельца — нужны, чтобы показывать даже кластеры, отколовшиеся
+    # * от focus-узла (например после удаления связи), а не только компоненту связности focus.
+    rows = await db.execute(select(Person.id).where(Person.owner_user_id == owner_user_id))
+    return set(rows.scalars())
+
+
 async def get_household_graph(db: AsyncSession, person_id: uuid.UUID, current_user: User) -> GraphResponse:
     focus = await get_person_or_404(db, person_id)
     edges, generation = await _wave_traverse(db, {focus.id}, max_iterations=None)
+    # ** Показываем ВЕСЬ граф владельца, а не только компоненту связности focus-узла. После
+    # ** удаления child_of-связи (DELETE /relationships) отколовшийся человек и всё его поддерево
+    # ** остаются в БД и ОБЯЗАНЫ оставаться видимыми — иначе получаются «висячие» невидимые записи.
+    # ** Каждый оставшийся кластер обходим отдельно; генерации считаются локально, относительно
+    # ** его собственного узла-seed (общей опорной точки с focus у отколовшегося кластера уже нет).
+    owner_person_ids = await _graph_owner_person_ids(db, focus.owner_user_id)
+    remaining = owner_person_ids - set(generation.keys())
+    while remaining:
+        seed = next(iter(remaining))
+        cluster_edges, cluster_generation = await _wave_traverse(db, {seed}, max_iterations=None)
+        edges.update(cluster_edges)
+        for pid, gen in cluster_generation.items():
+            generation.setdefault(pid, gen)
+        remaining -= set(cluster_generation.keys())
     persons = await _load_person_nodes(db, generation, current_user)
     return GraphResponse(focus_person_id=focus.id, persons=persons, relationships=list(edges.values()))
 

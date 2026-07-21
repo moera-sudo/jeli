@@ -67,3 +67,11 @@ async def mark_all_read(db: AsyncSession, user_id: uuid.UUID) -> None:
     )
     await db.commit()
     logger.info("All notifications marked read for user %s", user_id)
+
+
+async def delete_notification(db: AsyncSession, user_id: uuid.UUID, notification_id: uuid.UUID) -> None:
+    # * Удаляет одно уведомление пользователя (проверка владельца — в get_notification_or_404).
+    notification = await get_notification_or_404(db, user_id, notification_id)
+    await db.delete(notification)
+    await db.commit()
+    logger.info("Notification deleted: user=%s id=%s", user_id, notification_id)

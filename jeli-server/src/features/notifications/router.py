@@ -52,6 +52,16 @@ async def mark_all_read(db=Depends(get_db), current_user: User = Depends(get_use
     await notifications_service.mark_all_read(db, current_user.id)
 
 
+@router.delete(
+    "/notifications/{id}",
+    status_code=204,
+    summary="Удалить уведомление",
+    description="Удаляет одно уведомление текущего пользователя. 404, если не найдено или принадлежит другому пользователю.",
+)
+async def delete_notification(id: uuid.UUID, db=Depends(get_db), current_user: User = Depends(get_user)) -> None:
+    await notifications_service.delete_notification(db, current_user.id, id)
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, user: User | None = Depends(get_user_ws)) -> None:
     # * Единая точка входа WS для всего приложения (уведомления сейчас, мессенджер — позже, тот же сокет).
