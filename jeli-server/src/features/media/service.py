@@ -1,4 +1,4 @@
-# Бизнес-логика фичи media: сохранение загруженных файлов на диск + метаданные в БД.
+# Business logic for the media feature: saving uploaded files to disk + metadata in the DB.
 import logging
 import uuid
 from pathlib import Path

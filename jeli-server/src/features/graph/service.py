@@ -1,7 +1,7 @@
-# Бизнес-логика фичи graph: CRUD над Person/Relationship, обход графа (recursive CTE + волновой обход),
-# атомарное создание узла+связи, брак (same-owner прямой / cross-owner через proposal, таргет по invite_code),
-# мэтчи (confirm/reject — данные пишет будущий Этап 4, здесь только graph-side эффекты),
-# делегирование прав редактирования графа, явное создание/присоединение к дереву, отвязка при удалении.
+# Business logic for the graph feature: CRUD over Person/Relationship, graph traversal (recursive CTE + wave traversal),
+# atomic node+relationship creation, marriage (direct for same-owner / via proposal for cross-owner, targeted by invite_code),
+# matches (confirm/reject — the data itself is written by the future Stage 4, here only the graph-side effects),
+# graph editing-rights delegation, explicit tree creation/joining, unlinking on deletion.
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -80,7 +80,7 @@ from src.features.user.models import User
 logger = logging.getLogger(__name__)
 
 
-# * Единый хелпер прав редактирования — owner ИЛИ делегированный коллаборатор.
+# * Unified editing-rights helper — owner OR a delegated collaborator.
 async def can_edit_graph(db: AsyncSession, current_user_id: uuid.UUID, owner_user_id: uuid.UUID) -> bool:
     if current_user_id == owner_user_id:
         return True
@@ -93,7 +93,7 @@ async def can_edit_graph(db: AsyncSession, current_user_id: uuid.UUID, owner_use
     return result.scalar_one_or_none() is not None
 
 
-# * То же самое, но ДОПОЛНИТЕЛЬНО разрешает самому живому человеку редактировать свой же узел.
+# * Same as above, but ADDITIONALLY allows the living person themselves to edit their own node.
 async def can_edit_person(db: AsyncSession, current_user: User, person: Person) -> bool:
     if await can_edit_graph(db, current_user.id, person.owner_user_id):
         return True
@@ -109,8 +109,8 @@ async def get_person_or_404(db: AsyncSession, person_id: uuid.UUID) -> Person:
 
 
 async def get_person_by_invite_code_or_404(db: AsyncSession, invite_code: str) -> Person:
-    # * Используется для таргета брачного предложения — в отличие от join-линковки, код здесь
-    # * НЕ проверяется на занятость (можно предлагать связь с уже зарегистрированным узлом).
+    # * Used to target a marriage proposal — unlike join-linking, the code here is
+    # * NOT checked for being already taken (you can propose a relationship with an already registered node).
     result = await db.execute(select(Person).where(Person.invite_code == invite_code))
     person = result.scalar_one_or_none()
     if person is None:
@@ -161,9 +161,9 @@ async def get_ancestors_with_depth(db: AsyncSession, person_id: uuid.UUID) -> di
 
 
 def _min_depth_per_id(rows) -> dict[uuid.UUID, int]:
-    # ! Один и тот же предок может быть достижим на разных глубинах через разные линии (схлопывание
-    # ! родословной) — UNION в CTE дедуплицирует по (id, depth), а не по id, так что для одного id
-    # ! может прийти несколько строк. Берём МИНИМАЛЬНУЮ глубину — ближайшее родство, детерминированно.
+    # ! The same ancestor can be reachable at different depths via different lines (pedigree collapse) —
+    # ! the UNION in the CTE deduplicates by (id, depth), not by id, so several rows can come back for
+    # ! the same id. We take the MINIMUM depth — the closest kinship, deterministically.
     depths: dict[uuid.UUID, int] = {}
     for row in rows:
         if row.id not in depths or row.depth < depths[row.id]:
@@ -189,9 +189,9 @@ async def get_descendants_with_depth(db: AsyncSession, person_id: uuid.UUID) -> 
 
 
 async def get_full_household_person_ids(db: AsyncSession, root_person_id: uuid.UUID) -> set[uuid.UUID]:
-    # * Используется ТОЛЬКО для агрегации /users/{id}/matches — не для визуального графа.
-    # * affinal_hops сбрасывается в 0 при пересечении graph_links — так проходим сколько угодно
-    # * кластеров подряд (браки/подтверждённые мэтчи), как описано в matching-algorhitm.md.
+    # * Used ONLY for /users/{id}/matches aggregation — not for the visual graph.
+    # * affinal_hops resets to 0 when crossing graph_links — this way we can traverse any number of
+    # * clusters in a row (marriages/confirmed matches), as described in matching-algorhitm.md.
     sql = text(
         """
         WITH RECURSIVE household(person_id, affinal_hops) AS (
@@ -248,7 +248,7 @@ async def _load_person_nodes(db: AsyncSession, generation: dict[uuid.UUID, int],
     nodes = []
     for person in persons:
         is_registered = person.linked_user_id is not None
-        # ** can_chat полностью считается сервером: жив + зарегистрирован + это не сам просматривающий.
+        # ** can_chat is entirely computed by the server: alive + registered + not the viewer themselves.
         can_chat = person.is_alive and is_registered and person.linked_user_id != current_user.id
         nodes.append(
             PersonNode(
@@ -284,9 +284,9 @@ async def _collect_child_of_edges(db: AsyncSession, ids: set[uuid.UUID]) -> dict
 async def _expand_match_bridges(
     db: AsyncSession, frontier: set[uuid.UUID], generation: dict[uuid.UUID, int]
 ) -> tuple[dict[uuid.UUID, GraphEdge], set[uuid.UUID]]:
-    # * match_confirmed graph_link не имеет обычного Relationship-ребра — рендерим отдельным псевдо-ребром.
-    # ** Мост продолжает обход через найденного человека (как и действующий брак) — иначе вся его семья
-    # ** (предки/потомки со стороны мэтча) никогда не подгружается, виден только он сам.
+    # * A match_confirmed graph_link has no regular Relationship edge — we render it as a separate pseudo-edge.
+    # ** The bridge continues traversal through the matched person (same as an active marriage) — otherwise
+    # ** their entire family (ancestors/descendants on the match side) never loads, only they themselves are visible.
     edges: dict[uuid.UUID, GraphEdge] = {}
     newly_bridged: set[uuid.UUID] = set()
     link_rows = await db.execute(
@@ -311,11 +311,11 @@ async def _expand_match_bridges(
 async def _wave_traverse(
     db: AsyncSession, seed_ids: set[uuid.UUID], max_iterations: int | None
 ) -> tuple[dict[uuid.UUID, GraphEdge], dict[uuid.UUID, int]]:
-    # * Общий волновой двунаправленный обход child_of + spouse_of, используется и GET /graph (bounded),
-    # * и household-graph (max_iterations=None — без ограничения, чтобы попадали сиблинги/племянники).
-    # ** Правило для spouse_of: действующий брак (marriage_end_reason IS NULL) продолжает обход ЧЕРЕЗ
-    # ** супруга (сливает его bloodline — нужно для детей от межграфового брака); расторгнутый брак —
-    # ** супруг добавляется только листом, без рекурсии в его семью.
+    # * Shared bidirectional wave traversal of child_of + spouse_of, used both by GET /graph (bounded)
+    # * and by household-graph (max_iterations=None — unbounded, so siblings/nephews get included).
+    # ** Rule for spouse_of: an active marriage (marriage_end_reason IS NULL) continues traversal THROUGH
+    # ** the spouse (merges their bloodline in — needed for children from a cross-graph marriage); a dissolved
+    # ** marriage — the spouse is added only as a leaf, without recursing into their family.
     generation: dict[uuid.UUID, int] = {pid: 0 for pid in seed_ids}
     edges: dict[uuid.UUID, GraphEdge] = {}
     frontier = set(seed_ids)
@@ -382,7 +382,7 @@ async def get_graph(db: AsyncSession, focus_person_id: uuid.UUID, depth: int, cu
 
 
 async def get_bloodline(db: AsyncSession, person_id: uuid.UUID, current_user: User) -> GraphResponse:
-    # * Строго прямая линия (child_of), без супругов — по определению из api-overview.md.
+    # * Strictly the direct line (child_of), no spouses — per the definition in api-overview.md.
     focus = await get_person_or_404(db, person_id)
     ancestors = await get_ancestors_with_depth(db, focus.id)
     descendants = await get_descendants_with_depth(db, focus.id)
@@ -397,8 +397,8 @@ async def get_bloodline(db: AsyncSession, person_id: uuid.UUID, current_user: Us
 
 
 async def _graph_owner_person_ids(db: AsyncSession, owner_user_id: uuid.UUID) -> set[uuid.UUID]:
-    # * Все узлы графа данного владельца — нужны, чтобы показывать даже кластеры, отколовшиеся
-    # * от focus-узла (например после удаления связи), а не только компоненту связности focus.
+    # * All graph nodes of a given owner — needed to show even clusters that have split off
+    # * from the focus node (e.g. after a relationship deletion), not just focus's connected component.
     rows = await db.execute(select(Person.id).where(Person.owner_user_id == owner_user_id))
     return set(rows.scalars())
 
@@ -406,11 +406,11 @@ async def _graph_owner_person_ids(db: AsyncSession, owner_user_id: uuid.UUID) ->
 async def get_household_graph(db: AsyncSession, person_id: uuid.UUID, current_user: User) -> GraphResponse:
     focus = await get_person_or_404(db, person_id)
     edges, generation = await _wave_traverse(db, {focus.id}, max_iterations=None)
-    # ** Показываем ВЕСЬ граф владельца, а не только компоненту связности focus-узла. После
-    # ** удаления child_of-связи (DELETE /relationships) отколовшийся человек и всё его поддерево
-    # ** остаются в БД и ОБЯЗАНЫ оставаться видимыми — иначе получаются «висячие» невидимые записи.
-    # ** Каждый оставшийся кластер обходим отдельно; генерации считаются локально, относительно
-    # ** его собственного узла-seed (общей опорной точки с focus у отколовшегося кластера уже нет).
+    # ** We show the ENTIRE owner's graph, not just focus node's connected component. After
+    # ** deleting a child_of relationship (DELETE /relationships) the split-off person and their whole
+    # ** subtree remain in the DB and MUST stay visible — otherwise you get "dangling" invisible records.
+    # ** Each remaining cluster is traversed separately; generations are computed locally, relative to
+    # ** its own seed node (a split-off cluster no longer has a common reference point with focus).
     owner_person_ids = await _graph_owner_person_ids(db, focus.owner_user_id)
     remaining = owner_person_ids - set(generation.keys())
     while remaining:
@@ -429,8 +429,8 @@ def _format_generation_label(base: str, depth: int) -> str:
 
 
 async def compute_relation_to_viewer(db: AsyncSession, target_person_id: uuid.UUID, viewer_person_id: uuid.UUID) -> str | None:
-    # * Упрощённая структурная формулировка (не полная казахская терминология родства).
-    # TODO: заменить на словарь родственных терминов (нағашы/аға/іні/жиен), когда дойдут руки.
+    # * Simplified structural phrasing (not the full Kazakh kinship terminology).
+    # TODO: replace with a dictionary of kinship terms (nagashy/aga/іni/zhien) once there's time.
     if target_person_id == viewer_person_id:
         return "Это вы"
     ancestors = await get_ancestors_with_depth(db, viewer_person_id)
@@ -486,8 +486,8 @@ async def get_person_matches(db: AsyncSession, person_id: uuid.UUID) -> list[Mat
 
 
 async def get_user_matches(db: AsyncSession, target_user_id: uuid.UUID) -> list[MatchCandidate]:
-    # ! 404 на несуществующего пользователя — отсутствие СВЯЗАННОГО узла (ещё не создал дерево) при
-    # ! этом остаётся валидным состоянием и отдаёт пустой список, а не ошибку.
+    # ! 404 for a nonexistent user — the absence of a LINKED node (hasn't created a tree yet), however,
+    # ! remains a valid state and returns an empty list, not an error.
     await user_service.get_by_id_or_404(db, target_user_id)
     root = await get_linked_person(db, target_user_id)
     if root is None:
@@ -544,15 +544,15 @@ async def get_person_detail(db: AsyncSession, person_id: uuid.UUID, current_user
         created_at=person.created_at,
         updated_at=person.updated_at,
         relation_to_viewer=relation_to_viewer,
-        chat_thread_id=None,  # * Заполнится в Этапе 5 (messenger)
+        chat_thread_id=None,  # * Will be populated in Stage 5 (messenger)
         top_matches=top_matches,
         can_edit=can_edit,
     )
 
 
 def _blank_to_none(value: str | None) -> str | None:
-    # ! "" и None должны быть эквивалентны "не заполнено" — иначе geo_similarity/ethnic_lineage_modifier
-    # ! в мэтчинге по-разному трактуют пустую строку в зависимости от того, is_not(None) или truthy-чек.
+    # ! "" and None must be equivalent to "not filled in" — otherwise geo_similarity/ethnic_lineage_modifier
+    # ! in matching interpret an empty string differently depending on whether it's an is_not(None) or truthy check.
     return None if value == "" else value
 
 
@@ -566,8 +566,8 @@ def _build_person(
     zhuz = _blank_to_none(data.zhuz)
     ethnic_source = DEFAULT_ETHNIC_SOURCE
     if ru and tribe is None and zhuz is None:
-        # * Автоподстановка племени/жуза по ру (docs/matching-algorhitm.md §4) — только если клиент
-        # * их явно не указал сам (не затираем ручной ввод).
+        # * Auto-fill tribe/zhuz from ru (docs/matching-algorhitm.md §4) — only if the client
+        # * did not explicitly specify them itself (we don't overwrite manual input).
         derived = derive_tribe_zhuz(ru)
         if derived is not None:
             tribe, zhuz = derived
@@ -601,7 +601,7 @@ def _build_person(
 
 
 async def _propagate_origin_label(db: AsyncSession, source: Person, target: Person) -> None:
-    # * Union-find: перекрашивает весь кластер target (по child_of+spouse_of) в origin_label кластера source.
+    # * Union-find: recolors the entire target cluster (via child_of+spouse_of) to source cluster's origin_label.
     if source.origin_label == target.origin_label:
         return
     sql = text(
@@ -661,8 +661,8 @@ async def _create_person_with_relation(db: AsyncSession, current_user: User, dat
     relation = data.relation
 
     if relation.type in ("parent", "child"):
-        # * Создание НОВОГО человека допускается только на СВОЕЙ стороне (даже внутри объединённого
-        # * кластера) — нельзя внедрять новых людей в чужую половину графа, только связывать существующих.
+        # * Creating a NEW person is only allowed on YOUR OWN side (even within a merged
+        # * cluster) — you cannot inject new people into someone else's half of the graph, only link existing ones.
         if not await can_edit_graph(db, current_user.id, target.owner_user_id):
             raise NotPersonOwnerError()
         if relation.type == "parent":
@@ -683,7 +683,7 @@ async def _create_person_with_relation(db: AsyncSession, current_user: User, dat
         logger.info("Person created with %s relation: %s -> %s", relation.type, person.id, target.id)
         return person
 
-    # * "spouse" — новый человек всегда создаётся в собственном кластере до связывания.
+    # * "spouse" — the new person is always created in their own cluster before linking.
     person = _build_person(current_user.id, data)
     db.add(person)
     await db.flush()
@@ -722,15 +722,15 @@ async def update_person(db: AsyncSession, person: Person, current_user: User, da
     for field, value in data.items():
         setattr(person, field, value)
     if "ru" in data and "tribe" not in data and "zhuz" not in data:
-        # * Автоподстановка племени/жуза по обновлённому ру — только если клиент их явно не правит
-        # * этим же запросом (не затираем ручной ввод).
+        # * Auto-fill tribe/zhuz from the updated ru — only if the client is not explicitly editing them
+        # * in this same request (we don't overwrite manual input).
         derived = derive_tribe_zhuz(person.ru)
         if derived is not None:
             person.tribe, person.zhuz = derived
             person.ethnic_source = ETHNIC_SOURCE_DERIVED_FROM_RU
     if data.keys() & {"last_name", "first_name", "patronymic"}:
-        # ! Пересчёт normalized_name ОБЯЗАТЕЛЕН при правке любой части имени — иначе pg_trgm-индекс,
-        # ! используемый мэтчингом, тихо расходится с актуальными данными узла.
+        # ! Recomputing normalized_name is MANDATORY when editing any part of the name — otherwise the
+        # ! pg_trgm index used by matching silently drifts out of sync with the node's actual data.
         person.normalized_name = normalize_name(person.last_name, person.first_name, person.patronymic)
     if data:
         db.add(PersonEditLog(person_id=person.id, changed_fields=data))
@@ -741,8 +741,8 @@ async def update_person(db: AsyncSession, person: Person, current_user: User, da
 
 
 async def get_successor_candidates(db: AsyncSession, current_user: User) -> list[User]:
-    # * Живые зарегистрированные пользователи, связанные с твоим графом — свои Person с чужим
-    # * linked_user_id, плюс уже существующие коллабораторы. Кандидаты на передачу владения графом.
+    # * Living registered users linked to your graph — your own Person nodes with someone else's
+    # * linked_user_id, plus already existing collaborators. Candidates for handing over graph ownership.
     linked_result = await db.execute(
         select(Person.linked_user_id).where(
             Person.owner_user_id == current_user.id,
@@ -762,15 +762,15 @@ async def get_successor_candidates(db: AsyncSession, current_user: User) -> list
 
 
 async def transfer_ownership(db: AsyncSession, from_user_id: uuid.UUID, to_user_id: uuid.UUID) -> None:
-    # ** Всё, что привязано к ВЛАДЕЛЬЦУ графа, переезжает вместе с владением, а не только узлы —
-    # ** иначе общая история семьи и коллабораторы осиротеют под старым владельцем (family перестанет
-    # ** отображаться членам семьи, т.к. они читают её по новому owner_user_id).
+    # ** Everything attached to the graph OWNER moves along with the ownership, not just the nodes —
+    # ** otherwise the shared family history and collaborators would be orphaned under the old owner (family
+    # ** would stop showing up for family members, since they read it by the new owner_user_id).
     await db.execute(update(Person).where(Person.owner_user_id == from_user_id).values(owner_user_id=to_user_id))
-    # * family.owner_user_id уникален — на всякий случай убираем возможную запись преемника (её быть не должно,
-    # * т.к. он член ЭТОГО графа) перед переносом, чтобы не словить конфликт уникальности.
+    # * family.owner_user_id is unique — as a precaution we remove any possible successor record (there
+    # * shouldn't be one, since they're a member of THIS graph) before the transfer, to avoid a uniqueness conflict.
     await db.execute(delete(Family).where(Family.owner_user_id == to_user_id))
     await db.execute(update(Family).where(Family.owner_user_id == from_user_id).values(owner_user_id=to_user_id))
-    # * Коллабораторы графа тоже переходят к новому владельцу; сам новый владелец не может быть себе коллаба.
+    # * Graph collaborators also transfer to the new owner; the new owner itself cannot be its own collaborator.
     await db.execute(
         delete(GraphCollaborator).where(
             GraphCollaborator.graph_owner_id == from_user_id,
@@ -789,12 +789,12 @@ async def _owns_any_person(db: AsyncSession, user_id: uuid.UUID) -> bool:
 
 
 async def handle_account_deletion(db: AsyncSession, user: User, new_owner_user_id: uuid.UUID | None) -> None:
-    # * Вызывается ПЕРЕД удалением самого User (см. user.router.delete_account). Отвечает только за
-    # * graph-сторону: смысл всей функции — либо передать владение графом, либо дать каскаду отработать.
-    # * persons.owner_user_id -> ondelete=CASCADE: если владение НЕ передать здесь, удаление User ниже
-    # * каскадно удалит весь граф целиком (осознанное поведение, когда передавать некому).
-    # * persons.linked_user_id -> ondelete=SET NULL: свой собственный узел переживёт удаление аккаунта
-    # * автоматически, БЕЗ какого-либо кода здесь — узел просто отвяжется, данные не пропадут.
+    # * Called BEFORE the User itself is deleted (see user.router.delete_account). Handles only the
+    # * graph side: the whole point of this function is either to transfer graph ownership or let the cascade run.
+    # * persons.owner_user_id -> ondelete=CASCADE: if ownership is NOT transferred here, deleting the User below
+    # * will cascade-delete the entire graph (intentional behavior when there's no one to hand it to).
+    # * persons.linked_user_id -> ondelete=SET NULL: the person's own node survives account deletion
+    # * automatically, WITHOUT any code here — the node simply gets unlinked, the data is not lost.
     if not await _owns_any_person(db, user.id):
         return
     candidates = await get_successor_candidates(db, user)
@@ -812,8 +812,8 @@ async def handle_account_deletion(db: AsyncSession, user: User, new_owner_user_i
 async def delete_person(
     db: AsyncSession, person: Person, current_user: User, new_owner_user_id: uuid.UUID | None = None
 ) -> None:
-    # * Узел с linked_user_id НИКОГДА не удаляется целиком — только отвязывается (linked_user_id = NULL),
-    # * генеалогические данные и связи сохраняются. Только по-настоящему "неживой" узел удаляется каскадно.
+    # * A node with linked_user_id is NEVER deleted entirely — it is only unlinked (linked_user_id = NULL),
+    # * genealogical data and relationships are preserved. Only a truly "not living" node is deleted with cascade.
     if not await can_edit_person(db, current_user, person):
         raise NotPersonOwnerError()
 
@@ -825,7 +825,7 @@ async def delete_person(
 
     excluded_user_id = person.linked_user_id
     if excluded_user_id == current_user.id:
-        # * Self-delete/self-unlink: остальной граф нужно кому-то передать, если есть кому.
+        # * Self-delete/self-unlink: the rest of the graph needs to be handed to someone, if there's anyone to hand it to.
         candidates = await get_successor_candidates(db, current_user)
         if candidates:
             if new_owner_user_id is None:
@@ -862,22 +862,22 @@ async def generate_invite_code_for_person(db: AsyncSession, person: Person, curr
 
 
 async def link_existing_person_by_invite_code(db: AsyncSession, user: User, invite_code: str) -> Person | None:
-    # * Код НЕ обнуляется после использования — эксклюзивность через linked_user_id IS NULL,
-    # * т.к. один и тот же код переиспользуется и для брачных предложений (см. create_marriage_proposal).
+    # * The code is NOT reset after use — exclusivity is via linked_user_id IS NULL,
+    # * since the same code is also reused for marriage proposals (see create_marriage_proposal).
     result = await db.execute(select(Person).where(Person.invite_code == invite_code))
     person = result.scalar_one_or_none()
     if person is None or person.linked_user_id is not None:
         return None
     person.linked_user_id = user.id
-    # * Приоритет данных САМОГО пользователя над тем, что вписал владелец графа при заведении узла —
-    # * человек только что явно подтвердил эти данные о себе при регистрации, это авторитетнее догадки
-    # * владельца. Если у user поле пусто — как раньше, наоборот, подтягиваем его с узла на аккаунт.
-    # ! avatar_url сюда намеренно не входит: у User всегда стоит DEFAULT_AVATAR_URL (никогда не None),
-    # ! включение этого поля в правило стёрло бы реальную аватарку узла заглушкой при каждом join'е.
+    # * The user's OWN data takes priority over whatever the graph owner entered when creating the node —
+    # * the person has just explicitly confirmed this data about themselves at registration, which outweighs
+    # * the owner's guess. If a user field is empty — as before, conversely, we pull it from the node onto the account.
+    # ! avatar_url is intentionally excluded here: User always has DEFAULT_AVATAR_URL set (never None),
+    # ! including this field in the rule would overwrite the node's real avatar with the placeholder on every join.
     name_changed = False
-    # ! birth_country НАМЕРЕННО исключён из синхронизации: у User это свободный текст (напр. "Казахстан"),
-    # ! а у Person это короткий ISO-код (VARCHAR(8), напр. "KZ") — копирование имени страны в узел
-    # ! роняло join'ом StringDataRightTruncationError. Семантики полей несовместимы, поэтому не трогаем.
+    # ! birth_country is INTENTIONALLY excluded from sync: on User it's free text (e.g. "Kazakhstan"),
+    # ! while on Person it's a short ISO code (VARCHAR(8), e.g. "KZ") — copying the country name into the node
+    # ! crashed the join with StringDataRightTruncationError. The fields' semantics are incompatible, so we leave it alone.
     for field in ("last_name", "first_name", "patronymic", "gender", "ru", "tribe", "zhuz", "description"):
         user_value = getattr(user, field)
         if user_value is not None:
@@ -887,8 +887,8 @@ async def link_existing_person_by_invite_code(db: AsyncSession, user: User, invi
         else:
             setattr(user, field, getattr(person, field))
     if name_changed:
-        # ! Пересчёт normalized_name ОБЯЗАТЕЛЕН при правке ФИО — иначе pg_trgm-индекс мэтчинга
-        # ! тихо расходится с актуальными данными узла (тот же паттерн, что в update_person).
+        # ! Recomputing normalized_name is MANDATORY when editing the full name — otherwise matching's
+        # ! pg_trgm index silently drifts out of sync with the node's actual data (same pattern as in update_person).
         person.normalized_name = normalize_name(person.last_name, person.first_name, person.patronymic)
     await db.commit()
     await db.refresh(person)
@@ -921,14 +921,14 @@ async def create_root_person_for_user(db: AsyncSession, user: User) -> Person:
 
 
 async def create_root_person_explicit(db: AsyncSession, user: User) -> Person:
-    # * POST /graph/create — у пользователя может быть только одно дерево.
+    # * POST /graph/create — a user can only have one tree.
     if await get_linked_person(db, user.id) is not None:
         raise AlreadyHasPersonError()
     return await create_root_person_for_user(db, user)
 
 
 async def join_graph_by_invite_code(db: AsyncSession, user: User, invite_code: str) -> Person:
-    # * POST /graph/join — в отличие от best-effort в регистрации, здесь невалидный код это явная 404.
+    # * POST /graph/join — unlike the best-effort attempt at registration, an invalid code here is an explicit 404.
     if await get_linked_person(db, user.id) is not None:
         raise AlreadyHasPersonError()
     person = await link_existing_person_by_invite_code(db, user, invite_code)
@@ -946,8 +946,8 @@ async def create_relationship(db: AsyncSession, current_user: User, from_person_
     can_edit_both = await can_edit_graph(db, current_user.id, from_person.owner_user_id) and await can_edit_graph(
         db, current_user.id, to_person.owner_user_id
     )
-    # * Внутри уже объединённого браком/мэтчем кластера достаточно прав хотя бы на одну сторону —
-    # * доверие уже установлено на уровне подтверждённого брака (не нужен новый propose/confirm на ребёнка).
+    # * Within a cluster already merged by marriage/match, rights on just one side are enough —
+    # * trust has already been established at the confirmed-marriage level (no need for a new propose/confirm on a child).
     can_edit_within_merged_cluster = from_person.origin_label == to_person.origin_label and (
         await can_edit_graph(db, current_user.id, from_person.owner_user_id)
         or await can_edit_graph(db, current_user.id, to_person.owner_user_id)
@@ -1000,8 +1000,8 @@ async def delete_relationship(db: AsyncSession, relationship_id: uuid.UUID, curr
 
 
 async def update_relationship(db: AsyncSession, relationship_id: uuid.UUID, current_user: User, data: dict) -> Relationship:
-    # * Правка marriage_year/marriage_end_reason без удаления ребра — развод/вдовство сохраняются
-    # * как история брака (нужно для отображения бывшего супруга и общего ребёнка в household-graph).
+    # * Edits marriage_year/marriage_end_reason without deleting the edge — divorce/widowhood are preserved
+    # * as marriage history (needed to display the former spouse and shared child in household-graph).
     result = await db.execute(select(Relationship).where(Relationship.id == relationship_id))
     rel = result.scalar_one_or_none()
     if rel is None:
@@ -1024,8 +1024,8 @@ async def update_relationship(db: AsyncSession, relationship_id: uuid.UUID, curr
 
 
 async def insert_person_between(db: AsyncSession, current_user: User, data: PersonInsertBetweenRequest) -> Person:
-    # * Вставляет нового человека между двумя УЖЕ существующими напрямую связанными узлами —
-    # * защита от рискованного каскадного удаления при исправлении пропущенного поколения.
+    # * Inserts a new person between two ALREADY existing directly connected nodes —
+    # * protection against risky cascading deletion when fixing a missing generation.
     parent = await get_person_or_404(db, data.parent_id)
     child = await get_person_or_404(db, data.child_id)
     if not (await can_edit_person(db, current_user, parent) and await can_edit_person(db, current_user, child)):
@@ -1093,8 +1093,8 @@ async def create_marriage_proposal(db: AsyncSession, current_user: User, data: M
         )
     )
     if existing_marriage.scalar_one_or_none() is not None:
-        # ! Без этой проверки: та же пара направление-в-направление уронит IntegrityError (500) на
-        # ! уникальном ограничении ребра, а обратное направление тихо создаст вторую связь брака.
+        # ! Without this check: the same pair in the same direction would crash with an IntegrityError (500) on
+        # ! the edge's unique constraint, while the reverse direction would silently create a second marriage relationship.
         raise DuplicateRelationshipError()
 
     if can_edit_a and can_edit_b:
@@ -1182,8 +1182,8 @@ async def reject_marriage_proposal(db: AsyncSession, proposal: RelationshipPropo
 
 
 async def list_marriage_proposals_for_user(db: AsyncSession, current_user: User) -> list[RelationshipProposal]:
-    # ? Коллабораторские права здесь не учитываются (только прямое владение) — упрощение ради
-    # ? одного запроса без N+1; предложения к делегированным графам можно найти через владельца.
+    # ? Collaborator rights are not taken into account here (direct ownership only) — a simplification for
+    # ? a single query without N+1; proposals to delegated graphs can be found via the owner.
     owned_ids_result = await db.execute(select(Person.id).where(Person.owner_user_id == current_user.id))
     owned_ids = {row[0] for row in owned_ids_result.all()}
     result = await db.execute(
@@ -1216,7 +1216,7 @@ async def confirm_match(db: AsyncSession, match: MatchCandidate, current_user: U
     if match.confirmed_at is not None:
         raise MatchAlreadyResolvedError()
     if (is_a_side and match.person_a_rejected) or (is_b_side and match.person_b_rejected):
-        # ! Эта же сторона уже отклонила мэтч — нельзя одновременно confirmed=True и rejected=True.
+        # ! This same side has already rejected the match — cannot have confirmed=True and rejected=True at once.
         raise MatchAlreadyResolvedError()
 
     if is_a_side:
@@ -1226,8 +1226,8 @@ async def confirm_match(db: AsyncSession, match: MatchCandidate, current_user: U
 
     if match.person_a_confirmed and match.person_b_confirmed and match.confirmed_at is None:
         match.confirmed_at = datetime.now(timezone.utc)
-        # ! Инкремент ПОСЛЕ _link_clusters: _propagate_origin_label делает db.refresh(target) и
-        # ! затирает несохранённые изменения атрибутов target, если их выставить до вызова.
+        # ! Increment AFTER _link_clusters: _propagate_origin_label does db.refresh(target) and
+        # ! wipes out unsaved changes to target's attributes if they're set before the call.
         await _link_clusters(db, person_a, person_b, GRAPH_LINK_TYPE_MATCH_CONFIRMED, source_match_id=match.id)
         person_a.confirmation_count += 1
         person_b.confirmation_count += 1
@@ -1248,7 +1248,7 @@ async def reject_match(db: AsyncSession, match: MatchCandidate, current_user: Us
     if match.confirmed_at is not None:
         raise MatchAlreadyResolvedError()
     if (is_a_side and match.person_a_confirmed) or (is_b_side and match.person_b_confirmed):
-        # ! Эта же сторона уже подтвердила мэтч — нельзя одновременно confirmed=True и rejected=True.
+        # ! This same side has already confirmed the match — cannot have confirmed=True and rejected=True at once.
         raise MatchAlreadyResolvedError()
     if is_a_side:
         match.person_a_rejected = True
@@ -1261,8 +1261,8 @@ async def reject_match(db: AsyncSession, match: MatchCandidate, current_user: Us
 
 
 async def grant_collaborator(db: AsyncSession, current_user: User, person_id: uuid.UUID) -> GraphCollaborator:
-    # * Только СТРОГО владелец (не коллаборатор) может выдавать права коллаборатора — и только
-    # * на свой же живой зарегистрированный узел (мини-карточка узла на фронте).
+    # * Only the STRICT owner (not a collaborator) can grant collaborator rights — and only
+    # * through their own living registered node (a node mini-card on the frontend).
     person = await get_person_or_404(db, person_id)
     if person.owner_user_id != current_user.id:
         raise NotPersonOwnerError(message="You must own this person node to grant collaborator rights through it")

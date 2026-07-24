@@ -1,6 +1,6 @@
-# ORM-модели фичи messenger: простые 1-на-1 текстовые чаты. user_a_id/user_b_id — канонический
-# порядок по str(id) (та же схема, что MatchCandidate.person_a_id/person_b_id), чтобы get-or-create
-# был идемпотентным независимо от того, кто из двоих инициирует чат.
+# ORM models for the messenger feature: simple 1-on-1 text chats. user_a_id/user_b_id follow a
+# canonical order by str(id) (the same scheme as MatchCandidate.person_a_id/person_b_id) so that
+# get-or-create is idempotent regardless of which of the two users initiates the chat.
 import uuid
 from datetime import datetime
 

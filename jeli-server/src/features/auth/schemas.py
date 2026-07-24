@@ -1,4 +1,4 @@
-# Pydantic-схемы фичи auth: запросы регистрации/логина/рефреша и ответы с токенами.
+# Pydantic schemas for the auth feature: registration/login/refresh requests and token responses.
 from pydantic import BaseModel, EmailStr, Field
 
 from src.features.user.schemas import OptionalProfileFields, UserMe
@@ -10,13 +10,13 @@ class RegisterRequest(BaseModel):
     last_name: str = Field(min_length=1, max_length=255)
     first_name: str = Field(min_length=1, max_length=255)
     patronymic: str | None = None
-    # * Best-effort линковка к существующему узлу графа (см. graph.service.link_existing_person_by_invite_code).
-    # * Дерево при регистрации больше не создаётся автоматически — см. POST /graph/create, /graph/join.
+    # * Best-effort linking to an existing graph node (see graph.service.link_existing_person_by_invite_code).
+    # * A tree is no longer created automatically on registration — see POST /graph/create, /graph/join.
     graph_invite_code: str | None = None
 
 
 class RegisterWithInfoRequest(RegisterRequest, OptionalProfileFields):
-    # * Те же обязательные поля, что RegisterRequest, плюс все опциональные профильные поля.
+    # * Same required fields as RegisterRequest, plus all optional profile fields.
     avatar_url: str | None = None
 
 
@@ -36,5 +36,5 @@ class TokenPair(BaseModel):
 
 
 class AuthResponse(TokenPair):
-    # * Ответ register/register-with-info/login: токены + базовая информация о пользователе.
+    # * Response for register/register-with-info/login: tokens + basic information about the user.
     user: UserMe

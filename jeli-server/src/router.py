@@ -1,4 +1,4 @@
-# Агрегатор роутов всех фич под общим префиксом /api.
+# Aggregator of routes from all features under the common /api prefix.
 import logging
 
 from fastapi import APIRouter
@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["api"])
 
 
-@router.get("/health", summary="Проверка работоспособности сервиса")
+@router.get("/health", summary="Service health check")
 async def health_check() -> dict[str, str]:
-    # * Используется docker-compose healthcheck и внешним мониторингом.
+    # * Used by the docker-compose healthcheck and external monitoring.
     logger.info("Health check requested")
     return {"status": "ok"}
 

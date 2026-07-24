@@ -1,5 +1,5 @@
-# Pydantic-схемы фичи user: профиль текущего пользователя, публичный профиль другого пользователя,
-# частичное обновление профиля. Переиспользуются фичей auth для ответов на регистрацию/логин.
+# Pydantic schemas for the user feature: current user's profile, another user's public profile,
+# partial profile update. Reused by the auth feature for registration/login responses.
 import uuid
 from datetime import date, datetime
 from typing import Literal
@@ -10,8 +10,8 @@ Gender = Literal["male", "female"]
 
 
 class OptionalProfileFields(BaseModel):
-    # * Общие необязательные поля профиля — переиспользуются в auth.RegisterWithInfoRequest,
-    # * user.ProfileUpdateRequest и user.ProfileCreateRequest.
+    # * Common optional profile fields — reused in auth.RegisterWithInfoRequest,
+    # * user.ProfileUpdateRequest, and user.ProfileCreateRequest.
     gender: Gender | None = None
     current_city: str | None = None
     current_country: str | None = None
@@ -26,7 +26,7 @@ class OptionalProfileFields(BaseModel):
 
 
 class UserMe(BaseModel):
-    # * Полная информация о текущем пользователе (GET /users/profile/me и ответы auth-эндпоинтов).
+    # * Full information about the current user (GET /users/profile/me and auth endpoint responses).
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -52,12 +52,12 @@ class UserMe(BaseModel):
 
 
 class UserPublic(BaseModel):
-    # * Публичный профиль другого пользователя — без email и hashed_password.
+    # * Public profile of another user — without email and hashed_password.
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    # * Узел графа, привязанный к этому аккаунту (см. graph_service.get_linked_person) — не атрибут
-    # * User, поэтому default=None здесь и проставляется отдельно через model_copy(update=...) в роутере.
+    # * The graph node linked to this account (see graph_service.get_linked_person) — not an attribute
+    # * of User, so it defaults to None here and is set separately via model_copy(update=...) in the router.
     person_id: uuid.UUID | None = None
     last_name: str | None
     first_name: str | None
@@ -78,12 +78,12 @@ class UserPublic(BaseModel):
 
 
 class ProfileCreateRequest(OptionalProfileFields):
-    # * POST /users/create — доп.поля профиля без last_name/first_name/patronymic (задаются при регистрации).
+    # * POST /users/create — additional profile fields without last_name/first_name/patronymic (set at registration).
     avatar_url: str | None = None
 
 
 class ProfileUpdateRequest(OptionalProfileFields):
-    # * PATCH /users/profile/edit — то же самое плюс имя.
+    # * PATCH /users/profile/edit — the same, plus the name.
     last_name: str | None = None
     first_name: str | None = None
     patronymic: str | None = None

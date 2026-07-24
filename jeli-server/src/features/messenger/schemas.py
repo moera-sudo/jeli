@@ -1,4 +1,4 @@
-# Pydantic-схемы фичи messenger.
+# Pydantic schemas for the messenger feature.
 import uuid
 from datetime import datetime
 

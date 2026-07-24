@@ -1,5 +1,5 @@
-# Pydantic-схемы фичи graph: узлы/рёбра графа (light+heavy), запросы на создание/правку персон и связей,
-# предложения брака, чтение кандидатов в мэтчи, делегирование прав редактирования.
+# Pydantic schemas for the graph feature: graph nodes/edges (light+heavy), requests to create/edit persons
+# and relationships, marriage proposals, reading match candidates, editing-rights delegation.
 import uuid
 from datetime import datetime
 from typing import Literal
@@ -20,7 +20,7 @@ RelationInputType = Literal["parent", "child", "spouse"]
 
 
 class PersonNode(BaseModel):
-    # * Лёгкая версия узла — GET /graph, GET /persons/{id}/bloodline, /household-graph.
+    # * Light version of a node — GET /graph, GET /persons/{id}/bloodline, /household-graph.
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -39,7 +39,7 @@ class PersonNode(BaseModel):
 
 
 class GraphEdge(BaseModel):
-    # * Общее ребро для persons[]/relationships[] — покрывает и Relationship, и match_confirmed graph_link.
+    # * Common edge for persons[]/relationships[] — covers both Relationship and match_confirmed graph_link.
     id: uuid.UUID
     from_person_id: uuid.UUID
     to_person_id: uuid.UUID
@@ -67,13 +67,13 @@ class MatchCandidateRead(BaseModel):
     person_b_rejected: bool
     confirmed_at: datetime | None
     last_computed_at: datetime | None
-    # * Не колонки БД — считаются относительно viewer'а в service.get_person_matches/get_user_matches.
+    # * Not DB columns — computed relative to the viewer in service.get_person_matches/get_user_matches.
     relation_path_to_viewer: str | None = None
     is_blood_relative_of_viewer: bool | None = None
 
 
 class PersonDetail(BaseModel):
-    # * Тяжёлая версия — GET /persons/{id}.
+    # * Heavy version — GET /persons/{id}.
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -103,18 +103,18 @@ class PersonDetail(BaseModel):
     confirmation_count: int
     created_at: datetime
     updated_at: datetime
-    # * Вычисляемые поля — проставляются вручную в service.get_person_detail, не колонки модели.
+    # * Computed fields — set manually in service.get_person_detail, not model columns.
     relation_to_viewer: str | None
     chat_thread_id: uuid.UUID | None
     top_matches: list[MatchCandidateRead]
-    # * Может ли текущий пользователь редактировать этот узел (owner/коллаборатор/сам живой человек) —
-    # * фронт использует, чтобы показывать/скрывать кнопки редактирования/удаления/"сделать коллаборатором".
+    # * Whether the current user can edit this node (owner/collaborator/the living person themselves) —
+    # * used by the frontend to show/hide the edit/delete/"make collaborator" buttons.
     can_edit: bool
 
 
 class PersonRelationInput(BaseModel):
-    # * type читается ОТНОСИТЕЛЬНО to_person_id: "parent" — новый узел станет родителем to_person_id,
-    # * "child" — новый узел станет ребёнком to_person_id, "spouse" — новый узел станет супругом to_person_id.
+    # * type is interpreted RELATIVE TO to_person_id: "parent" — the new node becomes a parent of to_person_id,
+    # * "child" — the new node becomes a child of to_person_id, "spouse" — the new node becomes a spouse of to_person_id.
     to_person_id: uuid.UUID
     type: RelationInputType
     marriage_year: int | None = None
@@ -146,9 +146,9 @@ class PersonCreateRequest(BaseModel):
 
 
 class PersonInsertBetweenRequest(BaseModel):
-    # * Вставляет нового человека между двумя УЖЕ существующими напрямую связанными узлами
-    # * (child_id --child_of--> parent_id) — без риска каскадного удаления при исправлении
-    # * пропущенного поколения. См. service.insert_person_between.
+    # * Inserts a new person between two ALREADY existing directly connected nodes
+    # * (child_id --child_of--> parent_id) — without the risk of cascading deletion when fixing
+    # * a missing generation. See service.insert_person_between.
     last_name: str = Field(min_length=1, max_length=255)
     first_name: str = Field(min_length=1, max_length=255)
     patronymic: str | None = None
@@ -174,7 +174,7 @@ class PersonInsertBetweenRequest(BaseModel):
 
 
 class PersonUpdateRequest(BaseModel):
-    # * Все поля опциональны, паттерн exclude_unset как в user.ProfileUpdateRequest.
+    # * All fields are optional, exclude_unset pattern as in user.ProfileUpdateRequest.
     last_name: str | None = None
     first_name: str | None = None
     patronymic: str | None = None
@@ -199,15 +199,15 @@ class PersonUpdateRequest(BaseModel):
 
 
 class RelationshipCreateRequest(BaseModel):
-    # * spouse_of сюда не принимается — см. exceptions.SpouseRelationshipNotAllowedError.
+    # * spouse_of is not accepted here — see exceptions.SpouseRelationshipNotAllowedError.
     from_person_id: uuid.UUID
     to_person_id: uuid.UUID
     type: Literal["child_of"] = "child_of"
 
 
 class RelationshipUpdateRequest(BaseModel):
-    # * PATCH /relationships/{id} — правка marriage_year/marriage_end_reason без удаления ребра
-    # * (развод/вдовство сохраняются как история брака, а не стираются вместе с ребром).
+    # * PATCH /relationships/{id} — edits marriage_year/marriage_end_reason without deleting the edge
+    # * (divorce/widowhood are preserved as marriage history rather than erased along with the edge).
     marriage_year: int | None = None
     marriage_end_reason: MarriageEndReason | None = None
 
@@ -225,8 +225,8 @@ class RelationshipRead(BaseModel):
 
 
 class MarriageProposalCreateRequest(BaseModel):
-    # * person_b раскрывается через invite_code — у владельца одного графа нет и не может быть
-    # * person_id чужого узла (глобального поиска графов нет и не планируется).
+    # * person_b is resolved via invite_code — the owner of one graph does not and cannot have
+    # * the person_id of someone else's node (there is no global graph search, nor is one planned).
     person_a_id: uuid.UUID
     target_invite_code: str
     marriage_year: int | None = None
@@ -255,8 +255,8 @@ class GraphJoinRequest(BaseModel):
 
 
 class CollaboratorGrantRequest(BaseModel):
-    # * Коллаборатором можно сделать только уже живой зарегистрированный узел твоего графа —
-    # * выбирается по person_id (мини-карточка узла на фронте), не по email.
+    # * Only an already living, registered node in your own graph can be made a collaborator —
+    # * selected by person_id (a node mini-card on the frontend), not by email.
     person_id: uuid.UUID
 
 
@@ -270,7 +270,7 @@ class CollaboratorRead(BaseModel):
 
 
 class SuccessorCandidate(BaseModel):
-    # * Кандидат на передачу владения графом при self-delete/self-unlink — из Users, не Person.
+    # * Candidate to hand over graph ownership to on self-delete/self-unlink — from Users, not Person.
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -281,6 +281,6 @@ class SuccessorCandidate(BaseModel):
 
 
 class RuTaxonomySuggestion(BaseModel):
-    # * Подсказка тайпа/жуз по ру из справочника ru_taxonomy. Оба поля null, если совпадений нет.
+    # * Tribe/zhuz suggestion by ru from the ru_taxonomy reference. Both fields are null if there are no matches.
     tribe: str | None
     zhuz: str | None

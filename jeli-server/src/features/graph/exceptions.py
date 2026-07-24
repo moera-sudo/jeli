@@ -1,4 +1,4 @@
-# Исключения фичи graph — наследники глобальных из src.exceptions.
+# Exceptions for the graph feature — subclasses of the global ones from src.exceptions.
 from src.exceptions import ConflictError, NotFoundError, PermissionDeniedError
 
 

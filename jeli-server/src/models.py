@@ -1,6 +1,6 @@
-# Агрегатор ORM-моделей всех фич — импортируется Alembic (alembic/env.py) для autogenerate.
-# Base определён в src.config.database; каждая фича регистрирует свои модели
-# через импорт ниже, чтобы попасть в Base.metadata.
+# Aggregator of ORM models from all features — imported by Alembic (alembic/env.py) for autogenerate.
+# Base is defined in src.config.database; each feature registers its models
+# via the import below so they end up in Base.metadata.
 from src.config.database import Base  # noqa: F401
 from src.features.user.models import User  # noqa: F401
 from src.features.graph.models import (  # noqa: F401

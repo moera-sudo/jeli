@@ -1,7 +1,7 @@
-# ORM-модели фичи graph: узлы графа (Person), рёбра родства/брака (Relationship),
-# межграфовые мосты (GraphLink), предложения брака (RelationshipProposal),
-# кандидаты в мэтчи (MatchCandidate, физически живёт здесь — см. решение по владению в Этапе 3),
-# лог правок узла (PersonEditLog, задел под Этап 4) и делегирование прав (GraphCollaborator).
+# ORM models for the graph feature: graph nodes (Person), kinship/marriage edges (Relationship),
+# cross-graph bridges (GraphLink), marriage proposals (RelationshipProposal),
+# match candidates (MatchCandidate, physically lives here — see the ownership decision in Stage 3),
+# node edit log (PersonEditLog, groundwork for Stage 4), and rights delegation (GraphCollaborator).
 import uuid
 from datetime import datetime
 
@@ -31,23 +31,23 @@ class Person(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    # * Кто ведёт эту ветку дерева — по умолчанию единственный, кто может её мутировать
-    # * (расширяется через graph_collaborators, см. service.can_edit_graph).
+    # * Who owns this branch of the tree — by default the only one who can mutate it
+    # * (extended via graph_collaborators, see service.can_edit_graph).
     owner_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    # * Заполняется, когда узел подтверждённо соответствует реальному аккаунту (self-root либо invite-code линковка).
+    # * Populated once a node is confirmed to correspond to a real account (self-root or invite-code linking).
     linked_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, unique=True
     )
-    # * Метка кластера — общая у всех узлов одной изначально несвязанной ветки.
-    # * Перекрашивается (union-find) при подтверждённом браке/мэтче, см. service._link_clusters.
+    # * Cluster label — shared by all nodes of a branch that was originally disconnected.
+    # * Recolored (union-find) on a confirmed marriage/match, see service._link_clusters.
     origin_label: Mapped[uuid.UUID] = mapped_column(nullable=False, index=True, default=uuid.uuid4)
 
-    # * Nullable на уровне БД (старые записи бэкфиллятся пустыми, см. миграцию 0006) — обязательность
-    # * last_name/first_name для НОВЫХ узлов обеспечивается на уровне схем (PersonCreateRequest и т.п.).
+    # * Nullable at the DB level (legacy rows are backfilled empty, see migration 0006) — the requirement
+    # * that last_name/first_name be set for NEW nodes is enforced at the schema level (PersonCreateRequest, etc.).
     last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     patronymic: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # * lower+trim от last_name+first_name+patronymic — используется для pg_trgm similarity() в мэтчинге.
+    # * lower+trim of last_name+first_name+patronymic — used for pg_trgm similarity() in matching.
     normalized_name: Mapped[str] = mapped_column(String(255), nullable=False)
     gender: Mapped[str] = mapped_column(String(16), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
@@ -70,12 +70,12 @@ class Person(Base):
     source_type: Mapped[str] = mapped_column(String(32), nullable=False, default=DEFAULT_SOURCE_TYPE)
     has_attached_file: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     file_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
-    # * Свободный рассказ об этом человеке — особенно важен для умерших/незарегистрированных узлов,
-    # * у которых нет собственного профиля, чтобы рассказать о себе (см. User.description).
+    # * Free-form story about this person — especially important for deceased/unregistered nodes,
+    # * which have no profile of their own to tell their story (see User.description).
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     confirmation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    # * Одноразовый код для линковки реального аккаунта к этому узлу (см. POST /persons/{id}/invite-code).
+    # * One-time code for linking a real account to this node (see POST /persons/{id}/invite-code).
     invite_code: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -90,7 +90,7 @@ class Relationship(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    # * child_of: from=ребёнок, to=родитель (переименовано из parent_of, направление то же).
+    # * child_of: from=child, to=parent (renamed from parent_of, same direction).
     from_person_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("persons.id", ondelete="CASCADE"), nullable=False, index=True)
     to_person_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("persons.id", ondelete="CASCADE"), nullable=False, index=True)
     type: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -105,7 +105,7 @@ class GraphLink(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     person_a_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("persons.id", ondelete="CASCADE"), nullable=False, index=True)
     person_b_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("persons.id", ondelete="CASCADE"), nullable=False, index=True)
-    # * "marriage" | "match_confirmed" — см. constants.py
+    # * "marriage" | "match_confirmed" — see constants.py
     link_type: Mapped[str] = mapped_column(String(32), nullable=False)
     source_relationship_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("relationships.id", ondelete="SET NULL"), nullable=True
@@ -133,7 +133,7 @@ class RelationshipProposal(Base):
 
 
 class MatchCandidate(Base):
-    # * Физически создаётся здесь (graph); заполняется алгоритмом мэтчинга в Этапе 4 (см. решение по владению).
+    # * Physically created here (graph); populated by the matching algorithm in Stage 4 (see ownership decision).
     __tablename__ = "match_candidates"
     __table_args__ = (UniqueConstraint("person_a_id", "person_b_id", name="uq_match_candidate_pair"),)
 
@@ -153,7 +153,7 @@ class MatchCandidate(Base):
 
 
 class PersonEditLog(Base):
-    # * Минимальный лог правок — задел под Этап 4 (event-driven recompute), graph только пишет.
+    # * Minimal edit log — groundwork for Stage 4 (event-driven recompute), graph only writes to it.
     __tablename__ = "person_edit_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -163,7 +163,7 @@ class PersonEditLog(Base):
 
 
 class GraphCollaborator(Base):
-    # * Делегирование прав: graph_owner_id даёт collaborator_user_id права редактировать весь свой граф.
+    # * Rights delegation: graph_owner_id grants collaborator_user_id the right to edit their entire graph.
     __tablename__ = "graph_collaborators"
     __table_args__ = (UniqueConstraint("graph_owner_id", "collaborator_user_id", name="uq_graph_collaborator"),)
 

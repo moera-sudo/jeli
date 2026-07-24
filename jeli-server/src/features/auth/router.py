@@ -1,4 +1,4 @@
-# Роутер фичи auth: регистрация (кратко/полно), логин, рефреш токенов.
+# Router for the auth feature: registration (short/full), login, token refresh.
 import logging
 
 from fastapi import APIRouter, Depends
@@ -24,11 +24,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post(
     "/register",
     response_model=AuthResponse,
-    summary="Регистрация нового пользователя (краткая форма)",
+    summary="Register a new user (short form)",
     description=(
-        "Создаёт аккаунт по email, паролю, фамилии и имени (отчество опционально). Остальные поля профиля можно заполнить позже "
-        "через /users/profile/edit или /users/create. Возвращает пару JWT-токенов (access и refresh) "
-        "и базовую информацию о пользователе."
+        "Creates an account using email, password, last name, and first name (patronymic is optional). The rest of the "
+        "profile fields can be filled in later via /users/profile/edit or /users/create. Returns a pair of JWT tokens "
+        "(access and refresh) and basic information about the user."
     ),
 )
 async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)) -> AuthResponse:
@@ -40,11 +40,11 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
 @router.post(
     "/register/with-info",
     response_model=AuthResponse,
-    summary="Регистрация нового пользователя с полным профилем",
+    summary="Register a new user with a full profile",
     description=(
-        "Создаёт аккаунт и сразу заполняет все дополнительные поля профиля (город/страна, дата и место "
-        "рождения, национальность, ru/zhuz/tribe, аватар) за один запрос. Возвращает пару JWT-токенов "
-        "и полную информацию о пользователе."
+        "Creates an account and immediately fills in all additional profile fields (city/country, date and place "
+        "of birth, nationality, ru/zhuz/tribe, avatar) in a single request. Returns a pair of JWT tokens "
+        "and full information about the user."
     ),
 )
 async def register_with_info(payload: RegisterWithInfoRequest, db: AsyncSession = Depends(get_db)) -> AuthResponse:
@@ -56,8 +56,8 @@ async def register_with_info(payload: RegisterWithInfoRequest, db: AsyncSession 
 @router.post(
     "/login",
     response_model=AuthResponse,
-    summary="Вход по email и паролю",
-    description="Проверяет учётные данные и выдаёт новую пару JWT-токенов (access и refresh) вместе с информацией о пользователе.",
+    summary="Log in with email and password",
+    description="Verifies the credentials and issues a new pair of JWT tokens (access and refresh) along with information about the user.",
 )
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> AuthResponse:
     logger.info("Login request received")
@@ -68,10 +68,10 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> Au
 @router.post(
     "/refresh",
     response_model=TokenPair,
-    summary="Обновление пары токенов по refresh-токену",
+    summary="Refresh the token pair using a refresh token",
     description=(
-        "Принимает действующий refresh-токен, проверяет его тип и срок действия, выдаёт новую пару "
-        "access+refresh токенов (ротация). Старый refresh-токен нигде не отзывается (stateless-подход)."
+        "Accepts a valid refresh token, checks its type and expiration, and issues a new pair of "
+        "access+refresh tokens (rotation). The old refresh token is not revoked anywhere (stateless approach)."
     ),
 )
 async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db)) -> TokenPair:

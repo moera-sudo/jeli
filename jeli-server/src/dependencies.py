@@ -1,4 +1,4 @@
-# Глобальные FastAPI-зависимости, используемые несколькими фичами одновременно.
+# Global FastAPI dependencies shared across several features at once.
 import logging
 import uuid
 
@@ -16,7 +16,7 @@ from src.features.user.models import User
 
 logger = logging.getLogger(__name__)
 
-# * auto_error=False — сами формируем 401 в едином формате {"detail": ...} через UnauthorizedError.
+# * auto_error=False — we build the 401 ourselves in a unified {"detail": ...} format via UnauthorizedError.
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -24,8 +24,8 @@ async def get_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    # * Универсальная зависимость авторизации — переиспользуется во всех защищённых роутах проекта.
-    # ! Кидает UnauthorizedError (401) на отсутствующий/невалидный/просроченный токен или юзера.
+    # * Universal authorization dependency — reused across all protected routes in the project.
+    # ! Raises UnauthorizedError (401) for a missing/invalid/expired token or a missing user.
     if credentials is None:
         logger.info("Authorization failed: missing Bearer token")
         raise UnauthorizedError(message="Authentication required")
@@ -45,9 +45,9 @@ async def get_user(
 
 
 async def get_user_ws(websocket: WebSocket) -> User | None:
-    # * WS-версия авторизации: токен в query-параметре ?token=..., НЕ заголовок Authorization
-    # ! Никогда не бросает исключение — WS-роуты не проходят через HTTP exception handler из
-    # ! src/exceptions.py, поэтому эндпоинт сам решает, что делать с None (закрыть соединение до accept()).
+    # * WS version of authorization: token in the ?token=... query parameter, NOT the Authorization header
+    # ! Never raises an exception — WS routes don't go through the HTTP exception handler in
+    # ! src/exceptions.py, so the endpoint itself decides what to do with None (close the connection before accept()).
     token = websocket.query_params.get("token")
     if not token:
         logger.info("WS authorization failed: missing token query param")

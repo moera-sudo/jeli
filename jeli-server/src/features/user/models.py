@@ -1,4 +1,4 @@
-# ORM-модель пользователя: аккаунт + личный профиль (не узел графа, см. фичу graph в Этапе 4).
+# ORM model of the user: account + personal profile (not a graph node, see the graph feature in Stage 4).
 import uuid
 from datetime import date, datetime
 
@@ -15,14 +15,14 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    # * Nullable на уровне БД, т.к. старые записи бэкфиллятся пустыми (см. миграцию 0006) — обязательность
-    # * last_name/first_name для НОВЫХ записей обеспечивается на уровне схем (RegisterRequest и т.п.).
+    # * Nullable at the DB level, since old records are backfilled empty (see migration 0006) — the requirement
+    # * for last_name/first_name on NEW records is enforced at the schema level (RegisterRequest, etc.).
     last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     patronymic: Mapped[str | None] = mapped_column(String(255), nullable=True)
     avatar_url: Mapped[str] = mapped_column(String(1024), nullable=False, default=DEFAULT_AVATAR_URL)
-    # * Nullable — не собирается на регистрации, заполняется позже через профиль. Нужен для
-    # * создания root-Person (Person.gender обязателен), см. graph.service.create_root_person_for_user.
+    # * Nullable — not collected at registration, filled in later via the profile. Needed for
+    # * creating the root Person (Person.gender is required), see graph.service.create_root_person_for_user.
     gender: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     current_city: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -36,8 +36,8 @@ class User(Base):
     zhuz: Mapped[str | None] = mapped_column(String(255), nullable=True)
     tribe: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    # * Pass-through для фичи graph (Этап 4): код присоединения к существующему графу.
-    # TODO(graph): Этап 4 прочитает это поле при первом входе в граф и, вероятно, обнулит после использования.
+    # * Pass-through for the graph feature (Stage 4): code for joining an existing graph.
+    # TODO(graph): Stage 4 will read this field on first entry into the graph and likely clear it after use.
     graph_invite_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

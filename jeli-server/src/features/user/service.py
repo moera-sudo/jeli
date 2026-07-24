@@ -1,4 +1,4 @@
-# Бизнес-логика фичи user: CRUD над таблицей users. Не импортирует ничего из auth.
+# Business logic for the user feature: CRUD over the users table. Does not import anything from auth.
 import logging
 import uuid
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 async def get_by_id(db: AsyncSession, user_id: uuid.UUID) -> User | None:
-    # * Возвращает User или None, не кидает исключений — решение о 404 принимает вызывающий код.
+    # * Returns User or None, does not raise exceptions — the decision about 404 is made by the calling code.
     result = await db.execute(select(User).where(User.id == user_id))
     return result.scalar_one_or_none()
 
@@ -42,8 +42,8 @@ async def create_user(
     graph_invite_code: str | None = None,
     profile_fields: OptionalProfileFields | None = None,
 ) -> User:
-    # * Создаёт User; profile_fields — опциональный набор доп.полей (используется register/with-info).
-    # @param profile_fields: если None — все опциональные поля профиля останутся NULL
+    # * Creates a User; profile_fields — an optional set of additional fields (used by register/with-info).
+    # @param profile_fields: if None — all optional profile fields remain NULL
     user = User(
         email=email,
         hashed_password=hashed_password,
@@ -62,8 +62,8 @@ async def create_user(
 
 
 async def update_profile(db: AsyncSession, user: User, data: dict) -> User:
-    # * Частичное обновление: data — только реально переданные клиентом поля.
-    # @param data: dict из model_dump(exclude_unset=True)
+    # * Partial update: data — only the fields actually passed by the client.
+    # @param data: dict from model_dump(exclude_unset=True)
     for field, value in data.items():
         setattr(user, field, value)
     await db.commit()
@@ -73,8 +73,8 @@ async def update_profile(db: AsyncSession, user: User, data: dict) -> User:
 
 
 async def delete_user(db: AsyncSession, user: User) -> None:
-    # * graph-сторона (передача владения/каскад удаления графа) должна быть уже обработана ДО вызова —
-    # * см. graph.service.handle_account_deletion, вызываемый из user.router перед этой функцией.
+    # * The graph side (ownership transfer/cascading graph deletion) must already be handled BEFORE this call —
+    # * see graph.service.handle_account_deletion, called from user.router before this function.
     user_id = user.id
     await db.delete(user)
     await db.commit()

@@ -1,4 +1,4 @@
-# Исключения фичи media — наследники глобальных из src.exceptions.
+# Exceptions for the media feature — subclass the global ones from src.exceptions.
 from src.exceptions import AppException, NotFoundError
 
 

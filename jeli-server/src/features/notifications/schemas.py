@@ -1,4 +1,4 @@
-# Pydantic-схемы фичи notifications.
+# Pydantic schemas for the notifications feature.
 import uuid
 from datetime import datetime
 

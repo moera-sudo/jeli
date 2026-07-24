@@ -1,4 +1,4 @@
-# Константы фичи auth: типы JWT-токенов и имена claim-полей.
+# Constants for the auth feature: JWT token types and claim field names.
 TOKEN_TYPE_ACCESS = "access"
 TOKEN_TYPE_REFRESH = "refresh"
 

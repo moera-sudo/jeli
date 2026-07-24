@@ -1,4 +1,4 @@
-# Бизнес-логика фичи messenger: простые 1-на-1 чаты поверх ws_manager (Этап 4) и notifications.
+# Business logic for the messenger feature: simple 1-on-1 chats on top of ws_manager (Stage 4) and notifications.
 import logging
 import uuid
 
@@ -47,7 +47,7 @@ async def get_or_create_chat(db: AsyncSession, current_user: User, target_person
 
 
 async def get_existing_chat_id(db: AsyncSession, user_a_id: uuid.UUID, user_b_id: uuid.UUID) -> uuid.UUID | None:
-    # * Для обогащения PersonDetail.chat_thread_id из graph/router.py — только чтение, ничего не создаёт.
+    # * Used to enrich PersonDetail.chat_thread_id from graph/router.py — read-only, creates nothing.
     canonical_a, canonical_b = _canonical_order(user_a_id, user_b_id)
     result = await db.execute(select(Chat.id).where(Chat.user_a_id == canonical_a, Chat.user_b_id == canonical_b))
     return result.scalar_one_or_none()

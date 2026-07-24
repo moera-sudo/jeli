@@ -1,4 +1,4 @@
-# Роутер фичи family: markdown-история семьи, одна запись на владельца графа.
+# Router for the family feature: markdown family history, one record per graph owner.
 import uuid
 
 from fastapi import APIRouter, Depends
@@ -16,11 +16,11 @@ router = APIRouter(prefix="/family", tags=["family"])
 @router.get(
     "",
     response_model=FamilyRead,
-    summary="Получить общую историю своей семьи",
+    summary="Get the shared history of your own family",
     description=(
-        "Одна общая markdown-история на весь граф (ключ — владелец графа). Возвращает историю графа, "
-        "к которому принадлежит текущий пользователь (определяется по его узлу). Её видят и правят все "
-        "члены семьи. 404, если ещё не создана — используйте PUT /family."
+        "One shared markdown history for the entire graph (keyed by graph owner). Returns the history of the "
+        "graph that the current user belongs to (determined by their node). It is visible to and editable by "
+        "all family members. Returns 404 if it hasn't been created yet — use PUT /family."
     ),
 )
 async def get_my_family(
@@ -35,8 +35,8 @@ async def get_my_family(
 @router.get(
     "/{owner_user_id}",
     response_model=FamilyRead,
-    summary="Получить историю семьи другого пользователя",
-    description="Публичное чтение — консистентно с открытостью данных графа для поиска родственников.",
+    summary="Get another user's family history",
+    description="Public read access — consistent with the graph data being open for relative-matching search.",
 )
 async def get_family(
     owner_user_id: uuid.UUID,
@@ -50,13 +50,13 @@ async def get_family(
 @router.put(
     "",
     response_model=FamilyRead,
-    summary="Создать или полностью обновить общую историю семьи",
+    summary="Create or fully update the shared family history",
     description=(
-        "Ресурс единственный на весь граф (ключ — владелец графа). ЛЮБОЙ член семьи, принадлежащий "
-        "графу, редактирует одну и ту же общую историю — правка пишется под владельца графа, а не под "
-        "автора правки, поэтому итог виден всем. Создаёт запись, если её ещё нет, иначе полностью "
-        "перезаписывает title и content. Фото вставляются в content как markdown-ссылки на "
-        "/api/media/{id}, полученные через POST /media."
+        "The resource is unique for the entire graph (keyed by graph owner). ANY family member belonging to "
+        "the graph edits the same shared history — the edit is written under the graph owner, not under the "
+        "editor, so the result is visible to everyone. Creates the record if it doesn't exist yet, otherwise "
+        "fully overwrites title and content. Photos are inserted into content as markdown links to "
+        "/api/media/{id} obtained via POST /media."
     ),
 )
 async def upsert_family(

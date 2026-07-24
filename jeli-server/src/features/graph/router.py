@@ -1,6 +1,6 @@
-# Роутер фичи graph: создание/присоединение к дереву, узлы/связи графа, брак между узлами, чтение и
-# подтверждение мэтчей, делегирование прав редактирования. Без общего prefix (кроме /graph/*-эндпоинтов) —
-# пути прописаны явно, т.к. часть путей (/users/{id}/matches) логически принадлежит другому сегменту API.
+# Router for the graph feature: tree creation/joining, graph nodes/relationships, marriage between nodes, reading and
+# confirming matches, editing-rights delegation. No common prefix (except for the /graph/* endpoints) —
+# paths are spelled out explicitly, since some paths (/users/{id}/matches) logically belong to a different API segment.
 import logging
 import uuid
 
@@ -43,15 +43,15 @@ router = APIRouter(tags=["graph"])
 @router.get(
     "/ru-taxonomy",
     response_model=RuTaxonomySuggestion,
-    summary="Подсказка тайпа/жуза по ру",
+    summary="Tribe/zhuz suggestion by ru",
     description=(
-        "По названию ру возвращает предполагаемые тайпа (tribe) и жуз (zhuz) из справочника ru_taxonomy "
-        "(точное совпадение + fuzzy-подбор). Если совпадений нет — оба поля null. Фронт использует это "
-        "для автоподстановки в профиле (пользователь может изменить значения)."
+        "Given a ru name, returns the presumed tribe and zhuz from the ru_taxonomy reference "
+        "(exact match + fuzzy matching). If there are no matches — both fields are null. The frontend uses this "
+        "to auto-fill the profile (the user can change the values)."
     ),
 )
 async def suggest_ru_taxonomy(
-    ru: str = Query(..., min_length=1, max_length=255, description="Название ру"),
+    ru: str = Query(..., min_length=1, max_length=255, description="Ru name"),
     current_user: User = Depends(get_user),
 ) -> RuTaxonomySuggestion:
     derived = derive_tribe_zhuz(ru)
@@ -62,7 +62,7 @@ async def suggest_ru_taxonomy(
 
 
 async def _attach_chat_thread_id(db: AsyncSession, detail: PersonDetail, current_user: User) -> PersonDetail:
-    # * Только чтение — если чата ещё нет, chat_thread_id остаётся null (создаётся через POST /chats).
+    # * Read-only — if there's no chat yet, chat_thread_id stays null (created via POST /chats).
     if detail.linked_user_id is not None and detail.linked_user_id != current_user.id:
         detail.chat_thread_id = await messenger_service.get_existing_chat_id(
             db, current_user.id, detail.linked_user_id
@@ -73,11 +73,11 @@ async def _attach_chat_thread_id(db: AsyncSession, detail: PersonDetail, current
 @router.post(
     "/graph/create",
     response_model=PersonDetail,
-    summary="Создать своё генеалогическое дерево",
+    summary="Create your own genealogical tree",
     description=(
-        "Создаёт корневой узел графа для текущего пользователя (используется его gender из профиля — "
-        "заполните его через /users/profile/edit, если ещё не указан). У пользователя может быть только "
-        "одно дерево — повторный вызов вернёт ошибку."
+        "Creates a root graph node for the current user (uses their gender from the profile — "
+        "fill it in via /users/profile/edit if not set yet). A user can only have "
+        "one tree — calling this again returns an error."
     ),
 )
 async def create_graph(
@@ -94,11 +94,11 @@ async def create_graph(
 @router.post(
     "/graph/join",
     response_model=PersonDetail,
-    summary="Присоединиться к существующему дереву по коду",
+    summary="Join an existing tree by code",
     description=(
-        "Явное присоединение вне регистрации: находит узел по коду приглашения и привязывает его к "
-        "текущему аккаунту. Копирует в профиль (gender, ru, tribe, zhuz, birth_country) те поля, что там "
-        "ещё не заполнены. У пользователя может быть только одно дерево."
+        "Explicit joining outside of registration: finds a node by invite code and links it to the "
+        "current account. Copies into the profile (gender, ru, tribe, zhuz, birth_country) the fields that "
+        "are not yet filled in there. A user can only have one tree."
     ),
 )
 async def join_graph(
@@ -116,11 +116,11 @@ async def join_graph(
 @router.get(
     "/graph/successor-candidates",
     response_model=list[SuccessorCandidate],
-    summary="Кандидаты на передачу владения графом",
+    summary="Candidates for handing over graph ownership",
     description=(
-        "Живые зарегистрированные пользователи, связанные с вашим графом (свои узлы с чужим linked_user_id "
-        "+ существующие коллабораторы) — используется при удалении собственного узла, если граф нужно "
-        "кому-то передать."
+        "Living registered users linked to your graph (your own nodes with someone else's linked_user_id "
+        "+ existing collaborators) — used when deleting your own node, if the graph needs to be "
+        "handed over to someone."
     ),
 )
 async def get_successor_candidates(
@@ -134,14 +134,14 @@ async def get_successor_candidates(
 @router.post(
     "/persons",
     response_model=PersonDetail,
-    summary="Добавить человека в генеалогическое дерево",
+    summary="Add a person to the genealogical tree",
     description=(
-        "Создаёт новый узел графа. Можно передать поле relation, чтобы сразу указать связь с "
-        "существующим человеком (parent/child/spouse) — узел и связь создаются в одной транзакции. "
-        "Если relation.type=spouse и найденный человек принадлежит другому владельцу — вместо прямой "
-        "связи создаётся предложение брака, ожидающее подтверждения владельца второй стороны. "
-        "description — свободный рассказ об этом человеке, особенно полезен для умерших предков и "
-        "ещё не зарегистрированных родственников, у которых нет своего профиля, чтобы рассказать о себе."
+        "Creates a new graph node. You can pass the relation field to immediately specify a relationship with "
+        "an existing person (parent/child/spouse) — the node and the relationship are created in a single transaction. "
+        "If relation.type=spouse and the found person belongs to a different owner — instead of a direct "
+        "relationship, a marriage proposal is created, awaiting confirmation from the other side's owner. "
+        "description — a free-form story about this person, especially useful for deceased ancestors and "
+        "not-yet-registered relatives, who have no profile of their own to tell their story."
     ),
 )
 async def create_person(
@@ -162,12 +162,12 @@ async def create_person(
 @router.post(
     "/persons/insert-between",
     response_model=PersonDetail,
-    summary="Вставить человека между двумя узлами",
+    summary="Insert a person between two nodes",
     description=(
-        "Вставляет нового человека между двумя УЖЕ существующими напрямую связанными узлами "
-        "(child_id --child_of--> parent_id) — старое ребро удаляется, создаются два новых через "
-        "нового человека. Позволяет исправить пропущенное поколение без риска каскадного удаления "
-        "потомков, который случился бы при удалении/пересоздании узла."
+        "Inserts a new person between two ALREADY existing directly connected nodes "
+        "(child_id --child_of--> parent_id) — the old edge is deleted, two new ones are created through "
+        "the new person. Lets you fix a missing generation without the risk of cascading deletion "
+        "of descendants that would happen if the node were deleted/recreated."
     ),
 )
 async def insert_person_between(
@@ -187,8 +187,8 @@ async def insert_person_between(
 @router.get(
     "/persons/me",
     response_model=PersonDetail,
-    summary="Получить свой собственный узел-корень",
-    description="Возвращает узел графа, привязанный к текущему аккаунту (linked_user_id = вы).",
+    summary="Get your own root node",
+    description="Returns the graph node linked to the current account (linked_user_id = you).",
 )
 async def get_my_person(
     db: AsyncSession = Depends(get_db),
@@ -202,12 +202,12 @@ async def get_my_person(
 @router.get(
     "/persons/{id}",
     response_model=PersonDetail,
-    summary="Получить подробную карточку человека",
+    summary="Get a detailed person card",
     description=(
-        "Возвращает полную информацию об узле графа: даты, гео, родовые признаки, степень родства "
-        "относительно вас (relation_to_viewer), топ-совпадений (top_matches) и can_edit (можно ли вам "
-        "редактировать этот узел). Доступно любому авторизованному пользователю — данные графа открыты "
-        "для поиска родственников."
+        "Returns full information about a graph node: dates, geography, ancestry attributes, degree of kinship "
+        "relative to you (relation_to_viewer), top matches (top_matches), and can_edit (whether you can "
+        "edit this node). Available to any authorized user — graph data is open "
+        "for searching for relatives."
     ),
 )
 async def get_person(
@@ -222,12 +222,12 @@ async def get_person(
 @router.patch(
     "/persons/{id}",
     response_model=PersonDetail,
-    summary="Дозаполнить/исправить данные о человеке",
+    summary="Fill in/correct data about a person",
     description=(
-        "Частичное обновление узла. Доступно владельцу графа, его коллаборатору, а также самому "
-        "живому человеку, если узел привязан к его аккаунту (linked_user_id). description — свободный "
-        "рассказ об этом человеке, особенно полезен для умерших предков и ещё не зарегистрированных "
-        "родственников, у которых нет своего профиля, чтобы рассказать о себе."
+        "Partial update of a node. Available to the graph owner, their collaborator, and also to the living "
+        "person themselves, if the node is linked to their account (linked_user_id). description — a free-form "
+        "story about this person, especially useful for deceased ancestors and not-yet-registered "
+        "relatives, who have no profile of their own to tell their story."
     ),
 )
 async def update_person(
@@ -248,19 +248,19 @@ async def update_person(
 @router.delete(
     "/persons/{id}",
     status_code=204,
-    summary="Удалить/отвязать узел",
+    summary="Delete/unlink a node",
     description=(
-        "Если у узла есть привязанный живой аккаунт — узел НЕ удаляется, только отвязывается "
-        "(linked_user_id = null), все данные и связи сохраняются. При отвязке СВОЕГО собственного узла, "
-        "если с вашим графом связаны другие живые пользователи, нужно передать им владение графом через "
-        "new_owner_user_id (см. GET /graph/successor-candidates) — иначе вернётся ошибка. Обычный узел "
-        "без привязанного аккаунта удаляется полностью, каскадно."
+        "If a node has a living account linked to it — the node is NOT deleted, it is only unlinked "
+        "(linked_user_id = null), all data and relationships are preserved. When unlinking YOUR OWN node, "
+        "if other living users are linked to your graph, you need to hand over graph ownership to them via "
+        "new_owner_user_id (see GET /graph/successor-candidates) — otherwise an error is returned. A regular node "
+        "with no linked account is deleted completely, with cascade."
     ),
 )
 async def delete_person(
     id: uuid.UUID,
     new_owner_user_id: uuid.UUID | None = Query(
-        None, description="Кому передать владение графом при отвязке собственного узла"
+        None, description="Who to hand over graph ownership to when unlinking your own node"
     ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),
@@ -272,13 +272,13 @@ async def delete_person(
 @router.post(
     "/persons/{id}/invite-code",
     response_model=InviteCodeResponse,
-    summary="Сгенерировать код приглашения для узла",
+    summary="Generate an invite code for a node",
     description=(
-        "Генерирует код, который можно передать реальному родственнику (вручную, через сторонние "
-        "каналы связи) — используется и для присоединения к дереву (/graph/join, graph_invite_code при "
-        "регистрации), и как таргет предложения брака (/marriage-proposals). Код не одноразовый: "
-        "эксклюзивность присоединения обеспечивается тем, что узел с уже привязанным аккаунтом второй "
-        "раз присоединить нельзя."
+        "Generates a code that can be given to a real relative (manually, via third-party "
+        "communication channels) — used both for joining a tree (/graph/join, graph_invite_code at "
+        "registration), and as the target of a marriage proposal (/marriage-proposals). The code is not one-time use: "
+        "exclusivity of joining is ensured by the fact that a node with an already-linked account cannot be "
+        "joined a second time."
     ),
 )
 async def create_invite_code(
@@ -294,17 +294,17 @@ async def create_invite_code(
 @router.get(
     "/graph",
     response_model=GraphResponse,
-    summary="Получить облегчённый граф вокруг узла",
+    summary="Get a lightweight graph around a node",
     description=(
-        "Возвращает плоские persons[]/relationships[] вокруг focus-узла (формат для React Flow), "
-        "ограниченный глубиной depth поколений вверх/вниз. Если у узла есть действующий брак — обход "
-        "продолжается и через супруга (его предки/потомки тоже попадают в граф); если брак расторгнут — "
-        "супруг показывается только сам, без его семьи. Плюс подтверждённые мосты мэтчей."
+        "Returns flat persons[]/relationships[] around the focus node (a format for React Flow), "
+        "bounded by depth generations up/down. If a node has an active marriage — traversal "
+        "continues through the spouse as well (their ancestors/descendants also get into the graph); if the marriage "
+        "is dissolved — the spouse is shown only by themselves, without their family. Plus confirmed match bridges."
     ),
 )
 async def get_graph(
-    focus: uuid.UUID = Query(..., description="ID узла, вокруг которого строится граф"),
-    depth: int = Query(DEFAULT_GRAPH_DEPTH, ge=1, le=MAX_GRAPH_DEPTH, description="Глубина обхода в поколениях"),
+    focus: uuid.UUID = Query(..., description="ID of the node the graph is built around"),
+    depth: int = Query(DEFAULT_GRAPH_DEPTH, ge=1, le=MAX_GRAPH_DEPTH, description="Traversal depth in generations"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),
 ) -> GraphResponse:
@@ -314,8 +314,8 @@ async def get_graph(
 @router.get(
     "/persons/{id}/bloodline",
     response_model=GraphResponse,
-    summary="Кровная цепочка предков и потомков",
-    description="Только child_of-связи, строго прямая линия, без ограничения глубины — для отладки/отдельного отображения.",
+    summary="Blood chain of ancestors and descendants",
+    description="Only child_of relationships, strictly the direct line, no depth limit — for debugging/standalone display.",
 )
 async def get_bloodline(
     id: uuid.UUID,
@@ -328,10 +328,10 @@ async def get_bloodline(
 @router.get(
     "/persons/{id}/household-graph",
     response_model=GraphResponse,
-    summary="Объединённый граф для отображения",
+    summary="Merged graph for display",
     description=(
-        "Кровная линия + сиблинги/племянники (без ограничения глубины) + супруги (при действующем браке — "
-        "вместе с их предками/потомками, при расторгнутом — только сам супруг) + подтверждённые мосты мэтчей."
+        "Blood line + siblings/nephews-nieces (no depth limit) + spouses (for an active marriage — "
+        "together with their ancestors/descendants, for a dissolved one — the spouse alone) + confirmed match bridges."
     ),
 )
 async def get_household_graph(
@@ -345,11 +345,11 @@ async def get_household_graph(
 @router.post(
     "/relationships",
     response_model=RelationshipRead,
-    summary="Создать кровную связь между двумя узлами",
+    summary="Create a blood relationship between two nodes",
     description=(
-        "Создаёт ребро child_of между двумя уже существующими узлами. Требует прав редактирования на "
-        "оба узла — либо напрямую, либо (если узлы уже в одном объединённом браком/мэтчем кластере) хотя бы "
-        "на один из них. Для spouse_of используйте /marriage-proposals."
+        "Creates a child_of edge between two already existing nodes. Requires editing rights on "
+        "both nodes — either directly, or (if the nodes are already in one cluster merged by marriage/match) at least "
+        "on one of them. For spouse_of use /marriage-proposals."
     ),
 )
 async def create_relationship(
@@ -367,10 +367,10 @@ async def create_relationship(
 @router.patch(
     "/relationships/{id}",
     response_model=RelationshipRead,
-    summary="Изменить год/причину окончания брака",
+    summary="Change the year/reason marriage ended",
     description=(
-        "Правит marriage_year/marriage_end_reason у существующего ребра БЕЗ его удаления — развод/вдовство "
-        "сохраняются как история брака, а не стираются вместе с ребром."
+        "Edits marriage_year/marriage_end_reason on an existing edge WITHOUT deleting it — divorce/widowhood "
+        "are preserved as marriage history rather than erased along with the edge."
     ),
 )
 async def update_relationship(
@@ -387,8 +387,8 @@ async def update_relationship(
 @router.delete(
     "/relationships/{id}",
     status_code=204,
-    summary="Удалить связь",
-    description="Для ребра, созданного целиком по ошибке. Для развода/вдовства используйте PATCH.",
+    summary="Delete a relationship",
+    description="For an edge that was created entirely by mistake. For divorce/widowhood use PATCH.",
 )
 async def delete_relationship(
     id: uuid.UUID,
@@ -404,13 +404,13 @@ async def delete_relationship(
 @router.post(
     "/marriage-proposals",
     response_model=RelationshipProposalRead,
-    summary="Предложить брак между двумя узлами",
+    summary="Propose marriage between two nodes",
     description=(
-        "person_a_id — ваш известный узел. target_invite_code — код узла второй стороны (получен от "
-        "владельца другого графа вне приложения — глобального поиска графов нет). Если оба узла "
-        "редактируются текущим пользователем — брак создаётся мгновенно (статус confirmed). Если узлы "
-        "принадлежат разным владельцам — создаётся предложение (pending), ожидающее подтверждения "
-        "владельца второй стороны."
+        "person_a_id — your known node. target_invite_code — the other side's node code (obtained from "
+        "the other graph's owner outside the app — there is no global graph search). If both nodes are "
+        "edited by the current user — the marriage is created instantly (status confirmed). If the nodes "
+        "belong to different owners — a proposal (pending) is created, awaiting confirmation from "
+        "the other side's owner."
     ),
 )
 async def create_marriage_proposal(
@@ -425,8 +425,8 @@ async def create_marriage_proposal(
 @router.get(
     "/marriage-proposals",
     response_model=list[RelationshipProposalRead],
-    summary="Список предложений брака",
-    description="Входящие и исходящие предложения, где вы — инициатор либо владелец одной из сторон.",
+    summary="List marriage proposals",
+    description="Incoming and outgoing proposals where you are the initiator or the owner of one of the sides.",
 )
 async def list_marriage_proposals(
     db: AsyncSession = Depends(get_db),
@@ -439,8 +439,8 @@ async def list_marriage_proposals(
 @router.get(
     "/marriage-proposals/{id}",
     response_model=RelationshipProposalRead,
-    summary="Детали предложения брака",
-    description="Возвращает статус, участников и результат (если уже подтверждено/отклонено).",
+    summary="Marriage proposal details",
+    description="Returns the status, participants, and result (if already confirmed/rejected).",
 )
 async def get_marriage_proposal(
     id: uuid.UUID,
@@ -454,8 +454,8 @@ async def get_marriage_proposal(
 @router.post(
     "/marriage-proposals/{id}/confirm",
     response_model=RelationshipProposalRead,
-    summary="Подтвердить предложение брака",
-    description="Доступно только владельцу (или коллаборатору) второй стороны предложения.",
+    summary="Confirm a marriage proposal",
+    description="Available only to the owner (or collaborator) of the other side of the proposal.",
 )
 async def confirm_marriage_proposal(
     id: uuid.UUID,
@@ -470,8 +470,8 @@ async def confirm_marriage_proposal(
 @router.post(
     "/marriage-proposals/{id}/reject",
     response_model=RelationshipProposalRead,
-    summary="Отклонить предложение брака",
-    description="Доступно только владельцу (или коллаборатору) второй стороны предложения.",
+    summary="Reject a marriage proposal",
+    description="Available only to the owner (or collaborator) of the other side of the proposal.",
 )
 async def reject_marriage_proposal(
     id: uuid.UUID,
@@ -486,8 +486,8 @@ async def reject_marriage_proposal(
 @router.get(
     "/persons/{id}/matches",
     response_model=list[MatchCandidateRead],
-    summary="Мэтчи по кровной линии узла",
-    description="Возвращает найденные алгоритмом мэтчинга совпадения с кандидатами из чужих деревьев, отсортированные по score.",
+    summary="Matches along a node's blood line",
+    description="Returns matches found by the matching algorithm with candidates from other people's trees, sorted by score.",
 )
 async def get_person_matches(
     id: uuid.UUID,
@@ -501,10 +501,10 @@ async def get_person_matches(
 @router.get(
     "/users/{id}/matches",
     response_model=list[MatchCandidateRead],
-    summary="Все мэтчи по расширенному графу пользователя",
+    summary="All matches across a user's extended graph",
     description=(
-        "Главный эндпоинт для UI: агрегирует мэтчи по всему household-графу пользователя (кровь + "
-        "браки + подтверждённые мэтчи), найденные алгоритмом мэтчинга."
+        "The main endpoint for the UI: aggregates matches across the user's entire household graph (blood + "
+        "marriages + confirmed matches), found by the matching algorithm."
     ),
 )
 async def get_user_matches(
@@ -519,11 +519,11 @@ async def get_user_matches(
 @router.post(
     "/matches/{id}/confirm",
     response_model=MatchCandidateRead,
-    summary="Подтвердить совпадение со своей стороны",
+    summary="Confirm a match from your own side",
     description=(
-        "Подтверждает мэтч со стороны узла, который вы редактируете (владелец/коллаборатор). "
-        "При обоюдном подтверждении создаётся мост graph_link(match_confirmed), объединяющий "
-        "отображение графов, без физического слияния записей."
+        "Confirms the match on behalf of the node you edit (owner/collaborator). "
+        "On mutual confirmation, a graph_link(match_confirmed) bridge is created, merging the "
+        "display of the graphs, without physically merging the records."
     ),
 )
 async def confirm_match(
@@ -539,8 +539,8 @@ async def confirm_match(
 @router.post(
     "/matches/{id}/reject",
     response_model=MatchCandidateRead,
-    summary="Отклонить предложенное совпадение",
-    description="Отклоняет мэтч со стороны узла, который вы редактируете (владелец/коллаборатор).",
+    summary="Reject a proposed match",
+    description="Rejects the match on behalf of the node you edit (owner/collaborator).",
 )
 async def reject_match(
     id: uuid.UUID,
@@ -555,10 +555,10 @@ async def reject_match(
 @router.post(
     "/graph/collaborators",
     response_model=CollaboratorRead,
-    summary="Делегировать права редактирования своего графа",
+    summary="Delegate editing rights to your graph",
     description=(
-        "Даёт живому зарегистрированному узлу вашего графа (person_id) право редактировать весь ваш "
-        "граф наравне с вами. Узел должен принадлежать вам и быть привязан к реальному аккаунту."
+        "Grants a living registered node of your graph (person_id) the right to edit your entire "
+        "graph on equal footing with you. The node must belong to you and be linked to a real account."
     ),
 )
 async def grant_collaborator(
@@ -573,8 +573,8 @@ async def grant_collaborator(
 @router.get(
     "/graph/collaborators",
     response_model=list[CollaboratorRead],
-    summary="Список коллабораторов вашего графа",
-    description="Кому вы делегировали права редактирования своего графа.",
+    summary="List collaborators on your graph",
+    description="Who you have delegated editing rights to your graph to.",
 )
 async def list_collaborators(
     db: AsyncSession = Depends(get_db),
@@ -587,8 +587,8 @@ async def list_collaborators(
 @router.delete(
     "/graph/collaborators/{user_id}",
     status_code=204,
-    summary="Отозвать права коллаборатора",
-    description="Убирает у указанного пользователя право редактировать ваш граф.",
+    summary="Revoke collaborator rights",
+    description="Removes the specified user's right to edit your graph.",
 )
 async def revoke_collaborator(
     user_id: uuid.UUID,

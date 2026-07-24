@@ -1,4 +1,4 @@
-# Роутер фичи search: поиск профилей пользователей по ФИО.
+# Router for the search feature: searching user profiles by full name.
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,16 +15,16 @@ router = APIRouter(tags=["search"])
 @router.get(
     "/search",
     response_model=list[UserPublic],
-    summary="Поиск профилей по ФИО",
+    summary="Search profiles by full name",
     description=(
-        "Ищет других пользователей по вхождению q в фамилию/имя/отчество (без учёта регистра). "
-        "Себя самого в результатах не будет. person_id заполнен, только если найденный человек уже "
-        "создал/присоединился к дереву — по нему можно сразу вызвать POST /chats, чтобы написать ему."
+        "Searches other users by q occurring within last name/first name/patronymic (case-insensitive). "
+        "The current user is never included in the results. person_id is populated only if the found "
+        "person has already created/joined a tree — you can use it to call POST /chats right away to message them."
     ),
 )
 async def search_profiles(
-    q: str = Query(..., min_length=1, max_length=255, description="Подстрока для поиска по ФИО"),
-    limit: int = Query(DEFAULT_SEARCH_LIMIT, ge=1, le=MAX_SEARCH_LIMIT, description="Максимум результатов"),
+    q: str = Query(..., min_length=1, max_length=255, description="Substring to search for in the full name"),
+    limit: int = Query(DEFAULT_SEARCH_LIMIT, ge=1, le=MAX_SEARCH_LIMIT, description="Maximum number of results"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),
 ) -> list[UserPublic]:

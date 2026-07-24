@@ -1,4 +1,4 @@
-# Чистые функции скоринга алгоритма мэтчинга (без обращения к БД) — см. docs/matching-algorhitm.md.
+# Pure scoring functions of the matching algorithm (no DB access) — see docs/matching-algorhitm.md.
 from dataclasses import dataclass, field
 
 from rapidfuzz import fuzz
@@ -17,12 +17,12 @@ from src.features.matching.constants import (
 
 @dataclass
 class NodeMatch:
-    # * gen=0 — сама пара-кандидат из Stage 1 (person, candidate целиком), gen>0 — предки на уровне gen.
+    # * gen=0 — the candidate pair itself from Stage 1 (person, candidate as a whole), gen>0 — ancestors at level gen.
     person_a: Person
     person_b: Person
     gen: int
     confidence: float
-    sibling_count: int = field(default=1)  # * сколько confident-пар нашлось на этом же уровне поколения
+    sibling_count: int = field(default=1)  # * how many confident pairs were found at this same generation level
 
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
@@ -34,9 +34,9 @@ def normalized_name_similarity(name_a: str, name_b: str) -> float:
 
 
 def name_rarity_score(first_name: str, count: int) -> float:
-    # * count — сколько ДРУГИХ persons в базе имеют то же normalized_name (без self).
-    # ! На маленькой БД объективно частое имя может иметь count=0 и ошибочно выглядеть уникальным —
-    # ! COMMON_KAZAKH_FIRST_NAMES подстраховывает верхнюю границу для таких имён вне зависимости от БД.
+    # * count — how many OTHER persons in the DB have the same normalized_name (excluding self).
+    # ! On a small DB an objectively common name can have count=0 and incorrectly look unique —
+    # ! COMMON_KAZAKH_FIRST_NAMES caps the upper bound for such names regardless of the DB.
     if first_name.strip().lower() in COMMON_KAZAKH_FIRST_NAMES:
         return min(0.4, _count_based_rarity(count))
     return _count_based_rarity(count)
@@ -66,8 +66,8 @@ def generation_plausibility(gen_a: int, gen_b: int) -> float:
 
 
 def gen_offset_score(a: Person, b: Person, gen_a: int, gen_b: int) -> float:
-    # * Структурная глубина в графе — основной сигнал (бесплатный, всегда доступен). Дата рождения —
-    # * опциональное уточнение поверх, если известна у обоих узлов.
+    # * Structural depth in the graph — the primary signal (free, always available). Birth date is
+    # * an optional refinement on top, if known for both nodes.
     structural = generation_plausibility(gen_a, gen_b)
     if a.birth_year_value and b.birth_year_value:
         year_diff = abs(a.birth_year_value - b.birth_year_value)
@@ -97,7 +97,7 @@ def ethnic_lineage_modifier(a: Person, b: Person) -> float:
 
 
 def node_confidence(a: Person, b: Person, gen_a: int, gen_b: int, name_rarity_count: int) -> float:
-    # ! Вызывающая сторона ОБЯЗАНА проверить a.gender == b.gender до вызова (hard reject вне скоринга).
+    # ! The caller MUST check a.gender == b.gender before calling (hard reject outside of scoring).
     name_sim = normalized_name_similarity(a.normalized_name, b.normalized_name)
     rarity = name_rarity_score(a.first_name or "", name_rarity_count)
     geo = geo_similarity(a, b)

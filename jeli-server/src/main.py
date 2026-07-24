@@ -1,4 +1,4 @@
-# Точка входа FastAPI-приложения Jeli.
+# Entry point of the Jeli FastAPI application.
 import logging
 from contextlib import asynccontextmanager
 
@@ -27,8 +27,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Jeli API",
     description=(
-        "API для хранения генеалогических древ и мэтчинга дальних родственников "
-        "через алгоритм сопоставления цепочек предков."
+        "API for storing genealogical family trees and matching distant relatives "
+        "through an ancestor-chain matching algorithm."
     ),
     version="0.1.0",
     docs_url="/api/docs",

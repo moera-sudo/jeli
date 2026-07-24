@@ -1,4 +1,4 @@
-# Роутер фичи user: профиль текущего пользователя, публичный профиль другого пользователя, редактирование.
+# Router for the user feature: current user's profile, another user's public profile, editing.
 import logging
 import uuid
 
@@ -20,10 +20,10 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get(
     "/profile/me",
     response_model=UserMe,
-    summary="Получить полный профиль текущего пользователя",
+    summary="Get the full profile of the current user",
     description=(
-        "Возвращает всю информацию о текущем авторизованном пользователе, включая email, "
-        "но без хэша пароля. Требует Bearer access-токен."
+        "Returns all information about the currently authenticated user, including email, "
+        "but without the password hash. Requires a Bearer access token."
     ),
 )
 async def get_my_profile(current_user: User = Depends(get_user)) -> UserMe:
@@ -33,11 +33,11 @@ async def get_my_profile(current_user: User = Depends(get_user)) -> UserMe:
 @router.get(
     "/profile/{id}",
     response_model=UserPublic,
-    summary="Получить публичный профиль пользователя по ID",
+    summary="Get a user's public profile by ID",
     description=(
-        "Возвращает публичные данные другого пользователя (email и пароль скрыты). Полезно для "
-        "поиска родственников по геоданным и родовым признакам. Требует авторизации. "
-        "Возвращает 404, если пользователь не найден."
+        "Returns another user's public data (email and password are hidden). Useful for "
+        "finding relatives by geographic data and lineage attributes. Requires authorization. "
+        "Returns 404 if the user is not found."
     ),
 )
 async def get_public_profile(
@@ -53,11 +53,11 @@ async def get_public_profile(
 @router.patch(
     "/profile/edit",
     response_model=UserMe,
-    summary="Частично обновить профиль текущего пользователя",
+    summary="Partially update the current user's profile",
     description=(
-        "Позволяет обновить любые профильные поля (фамилия/имя/отчество, аватар, гео, родовые признаки, био) "
-        "текущего пользователя. Все поля опциональны — передаются только те, что нужно изменить. "
-        "Email и пароль через этот эндпоинт не редактируются. Нужен для редактирования информации в профиле"
+        "Allows updating any profile fields (last name/first name/patronymic, avatar, geo, lineage attributes, bio) "
+        "of the current user. All fields are optional — only the ones that need to change are passed. "
+        "Email and password are not edited through this endpoint. Needed for editing profile information"
     ),
 )
 async def edit_my_profile(
@@ -73,10 +73,10 @@ async def edit_my_profile(
 @router.post(
     "/create",
     response_model=UserMe,
-    summary="Заполнить дополнительные данные профиля",
+    summary="Fill in additional profile data",
     description=(
-        "Позволяет текущему пользователю дозаполнить профильные данные (гео, дата и место рождения, "
-        "родовые признаки, био, аватар) без изменения фамилии/имени/отчества. Не выдаёт новых токенов — это не auth-эндпоинт. auth/register + user/create = альтернатива register/with-info. Выбирай какой тебе больше нравится"
+        "Allows the current user to fill in additional profile data (geo, date and place of birth, "
+        "lineage attributes, bio, avatar) without changing the last name/first name/patronymic. Does not issue new tokens — this is not an auth endpoint. auth/register + user/create = an alternative to register/with-info. Choose whichever you prefer"
     ),
 )
 async def create_profile_details(
@@ -91,19 +91,19 @@ async def create_profile_details(
 @router.delete(
     "/delete",
     status_code=204,
-    summary="Удалить аккаунт пользователя",
+    summary="Delete a user account",
     description=(
-        "Полностью удаляет аккаунт (логин, профиль). Если привязанный узел в графе принадлежит "
-        "ДРУГОМУ владельцу — узел только отвязывается (linked_user_id становится null), все данные и "
-        "связи сохраняются. Если пользователь сам владеет графом и в нём есть другие зарегистрированные "
-        "участники или коллабораторы — нужно передать им владение через new_owner_user_id (см. "
-        "GET /graph/successor-candidates), иначе вернётся ошибка. Если пользователь единственный "
-        "владелец и передавать некому — весь граф удаляется вместе с аккаунтом."
+        "Completely deletes the account (login, profile). If the linked graph node belongs to "
+        "ANOTHER owner — the node is only unlinked (linked_user_id becomes null), all data and "
+        "connections are preserved. If the user themselves owns the graph and it has other registered "
+        "participants or collaborators — ownership must be transferred to them via new_owner_user_id (see "
+        "GET /graph/successor-candidates), otherwise an error is returned. If the user is the sole "
+        "owner and there is no one to transfer to — the entire graph is deleted along with the account."
     ),
 )
 async def delete_account(
     new_owner_user_id: uuid.UUID | None = Query(
-        None, description="Кому передать владение графом, если пользователь — единственный его владелец"
+        None, description="Who to transfer graph ownership to, if the user is its sole owner"
     ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_user),

@@ -1,4 +1,4 @@
-# Исключения фичи family — наследники глобальных из src.exceptions.
+# Exceptions for the family feature — subclass the global ones from src.exceptions.
 from src.exceptions import NotFoundError
 
 

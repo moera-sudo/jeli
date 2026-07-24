@@ -1,4 +1,4 @@
-# Конфигурация логирования приложения. Все сообщения логов — на английском языке.
+# Application logging configuration. All log messages are in English.
 import logging
 import logging.config
 
@@ -6,7 +6,7 @@ from src.config.settings import get_settings
 
 
 def setup_logging() -> None:
-    # * Настраивает root- и uvicorn-логгеры согласно LOG_LEVEL из настроек.
+    # * Configures the root and uvicorn loggers according to LOG_LEVEL from settings.
     settings = get_settings()
 
     logging.config.dictConfig(
@@ -33,7 +33,7 @@ def setup_logging() -> None:
                 "uvicorn": {"level": settings.log_level, "handlers": ["console"], "propagate": False},
                 "uvicorn.error": {"level": settings.log_level, "handlers": ["console"], "propagate": False},
                 "uvicorn.access": {"level": settings.log_level, "handlers": ["console"], "propagate": False},
-                # * SQL-запросы слишком многословны на уровне INFO/DEBUG для повседневной разработки
+                # * SQL queries are too verbose at INFO/DEBUG level for everyday development
                 "sqlalchemy.engine": {"level": "WARNING", "handlers": ["console"], "propagate": False},
             },
         }

@@ -1,4 +1,4 @@
-# Бизнес-логика фичи auth: хэширование паролей, выпуск/проверка JWT, регистрация, логин, рефреш.
+# Business logic for the auth feature: password hashing, JWT issuance/verification, registration, login, refresh.
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -37,7 +37,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def _create_token(user_id: uuid.UUID, token_type: str, expires_delta: timedelta) -> str:
-    # * Общий билдер JWT для access и refresh — отличаются только claim "type" и TTL.
+    # * Common JWT builder for access and refresh tokens — they only differ in the "type" claim and TTL.
     now = datetime.now(timezone.utc)
     payload = {
         CLAIM_SUB: str(user_id),
@@ -61,8 +61,8 @@ def create_token_pair(user_id: uuid.UUID) -> tuple[str, str]:
 
 
 def decode_token(token: str, expected_type: str) -> uuid.UUID:
-    # * Декодирует и валидирует JWT: подпись, срок действия (проверяет pyjwt), claim "type".
-    # ! Кидает InvalidTokenError на любую ошибку (просрочен/подпись неверна/type не совпал/sub не UUID)
+    # * Decodes and validates the JWT: signature, expiration (checked by pyjwt), "type" claim.
+    # ! Raises InvalidTokenError on any error (expired/invalid signature/type mismatch/sub not a UUID)
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
     except jwt.ExpiredSignatureError:
@@ -84,9 +84,9 @@ def decode_token(token: str, expected_type: str) -> uuid.UUID:
 
 
 async def _try_link_invite_code(db: AsyncSession, user: User, graph_invite_code: str | None) -> None:
-    # * Best-effort: если передан код приглашения — пробуем привязать существующий узел.
-    # * Дерево при регистрации больше НЕ создаётся автоматически (см. POST /graph/create, /graph/join) —
-    # * если код невалиден/уже занят, просто ничего не происходит, без ошибки.
+    # * Best-effort: if an invite code is provided — try to link an existing node.
+    # * A tree is no longer created automatically on registration (see POST /graph/create, /graph/join) —
+    # * if the code is invalid/already taken, nothing happens, no error is raised.
     if graph_invite_code:
         await graph_service.link_existing_person_by_invite_code(db, user, graph_invite_code)
 
@@ -152,7 +152,7 @@ async def login(db: AsyncSession, data: LoginRequest) -> tuple[User, str, str]:
 
 
 async def refresh(db: AsyncSession, refresh_token: str) -> tuple[str, str]:
-    # * Ротация refresh-токена: старый не отзывается (stateless, БД не хранит токены — принятый риск).
+    # * Refresh token rotation: the old one is not revoked (stateless, the DB doesn't store tokens — accepted risk).
     user_id = decode_token(refresh_token, expected_type=TOKEN_TYPE_REFRESH)
     user = await user_service.get_by_id(db, user_id)
     if user is None:

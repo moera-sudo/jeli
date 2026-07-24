@@ -1,5 +1,5 @@
-# ORM-модель Media: метаданные загруженного файла. Сам файл лежит на диске в settings.upload_dir
-# под именем id (без расширения) — content_type нужен, чтобы GET /media/{id} отдавал верный заголовок.
+# ORM model for Media: metadata of an uploaded file. The file itself lives on disk in settings.upload_dir
+# under its id (no extension) — content_type is needed so GET /media/{id} returns the correct header.
 import uuid
 from datetime import datetime
 

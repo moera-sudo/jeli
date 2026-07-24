@@ -1,4 +1,4 @@
-# Роутер фичи media: общий аплоад/отдача файлов + отдельные эндпоинты для аватарок профиля/person.
+# Router for the media feature: generic file upload/serving + dedicated endpoints for profile/person avatars.
 import uuid
 
 from fastapi import APIRouter, Depends, Response, UploadFile
@@ -24,11 +24,11 @@ def _media_url(media_id: uuid.UUID) -> str:
 @router.post(
     "/media",
     response_model=MediaUploadResponse,
-    summary="Загрузить файл",
+    summary="Upload a file",
     description=(
-        "Общий аплоад изображений (JPEG/PNG/WebP/GIF, до 10МБ) — используется, например, для вставки "
-        "фото внутрь markdown семейной истории (`PUT /family`). Возвращает ссылку вида `/api/media/{id}`, "
-        "которую можно подставить как есть (в `![alt](url)` или в любое другое поле-ссылку)."
+        "Generic image upload (JPEG/PNG/WebP/GIF, up to 10MB) — used, for example, to insert photos "
+        "into the markdown family history (`PUT /family`). Returns a link of the form `/api/media/{id}`, "
+        "which can be substituted as-is (in `![alt](url)` or into any other link field)."
     ),
 )
 async def upload_media(
@@ -42,11 +42,11 @@ async def upload_media(
 
 @router.get(
     "/media/{id}",
-    summary="Получить файл",
+    summary="Get a file",
     description=(
-        "Отдаёт сырые байты загруженного файла с корректным Content-Type. Без авторизации — обычный "
-        "`<img src=...>` в браузере не может передать Bearer-токен, поэтому эндпоинт публичный "
-        "(как и весь остальной граф данных, который открыт для поиска родственников)."
+        "Returns the raw bytes of the uploaded file with the correct Content-Type. No authorization — a "
+        "plain `<img src=...>` in the browser can't send a Bearer token, so the endpoint is public "
+        "(same as the rest of the graph data, which is open for relative-matching search)."
     ),
 )
 async def get_media(id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> Response:
@@ -58,8 +58,8 @@ async def get_media(id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> Respon
 @router.post(
     "/users/profile/avatar",
     response_model=UserMe,
-    summary="Загрузить аватар профиля",
-    description="Сохраняет файл и сразу проставляет avatar_url текущего пользователя — один вызов вместо upload+PATCH.",
+    summary="Upload a profile avatar",
+    description="Saves the file and immediately sets the current user's avatar_url — one call instead of upload+PATCH.",
 )
 async def upload_profile_avatar(
     file: UploadFile,
@@ -74,11 +74,11 @@ async def upload_profile_avatar(
 @router.post(
     "/persons/{id}/avatar",
     response_model=PersonDetail,
-    summary="Загрузить аватар узла графа",
+    summary="Upload a graph node avatar",
     description=(
-        "Сохраняет файл и сразу проставляет avatar_url узла — доступно владельцу/коллаборатору/самому "
-        "живому человеку (см. can_edit_person). is_alive никак не влияет на права — аватарку можно "
-        "поставить и умершему предку, если она есть в семейном архиве."
+        "Saves the file and immediately sets the node's avatar_url — available to the owner/collaborator/the "
+        "living person themselves (see can_edit_person). is_alive has no effect on permissions — an avatar can "
+        "also be set for a deceased ancestor if one exists in the family archive."
     ),
 )
 async def upload_person_avatar(

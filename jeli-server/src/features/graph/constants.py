@@ -1,4 +1,4 @@
-# Константы фичи graph: типы рёбер/связей, статусы, лимиты обхода графа.
+# Constants for the graph feature: edge/relationship types, statuses, graph traversal limits.
 RELATIONSHIP_TYPE_CHILD_OF = "child_of"
 RELATIONSHIP_TYPE_SPOUSE_OF = "spouse_of"
 
@@ -24,6 +24,6 @@ DEFAULT_GRAPH_DEPTH = 3
 MAX_GRAPH_DEPTH = 8
 TOP_MATCHES_LIMIT = 3
 
-# * Crockford Base32 без I/L/O/U — не путается при ручном вводе (коды шарятся текстом, не ссылкой).
+# * Crockford Base32 without I/L/O/U — unambiguous for manual entry (codes are shared as text, not a link).
 INVITE_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 INVITE_CODE_LENGTH = 8

@@ -1,4 +1,4 @@
-# Pydantic-схемы фичи family.
+# Pydantic schemas for the family feature.
 import uuid
 from datetime import datetime
 

@@ -1,4 +1,4 @@
-# Исключения фичи notifications — наследники глобальных из src.exceptions.
+# Exceptions for the notifications feature — subclasses of the global ones from src.exceptions.
 from src.exceptions import NotFoundError
 
 

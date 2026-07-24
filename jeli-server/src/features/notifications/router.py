@@ -1,7 +1,7 @@
-# Роутер фичи notifications: список/чтение уведомлений + единственная WS-точка входа приложения.
-# WS-роут физически лежит здесь (не в отдельной фиче messenger), т.к. notifications — первая фича,
-# которой он реально нужен; messenger в будущем переиспользует ТОТ ЖЕ /ws, добавив свой "type" в
-# мультиплексируемый JSON-конверт, без создания второго соединения (см. src/ws_manager.py).
+# Router for the notifications feature: list/read notifications + the app's single WS entry point.
+# The WS route physically lives here (not in a separate messenger feature) because notifications was
+# the first feature that actually needed it; messenger later reuses the SAME /ws, adding its own "type"
+# into the multiplexed JSON envelope, without opening a second connection (see src/ws_manager.py).
 import logging
 import uuid
 
@@ -21,11 +21,11 @@ router = APIRouter(tags=["notifications"])
 @router.get(
     "/notifications",
     response_model=list[NotificationRead],
-    summary="Список уведомлений",
-    description="Возвращает уведомления текущего пользователя, новые сверху. unread_only фильтрует только непрочитанные.",
+    summary="List notifications",
+    description="Returns the current user's notifications, newest first. unread_only filters to unread ones only.",
 )
 async def list_notifications(
-    unread_only: bool = Query(False, description="Только непрочитанные"),
+    unread_only: bool = Query(False, description="Unread only"),
     db=Depends(get_db),
     current_user: User = Depends(get_user),
 ) -> list[NotificationRead]:
@@ -36,7 +36,7 @@ async def list_notifications(
 @router.post(
     "/notifications/{id}/read",
     response_model=NotificationRead,
-    summary="Отметить уведомление прочитанным",
+    summary="Mark a notification as read",
 )
 async def mark_read(id: uuid.UUID, db=Depends(get_db), current_user: User = Depends(get_user)) -> NotificationRead:
     notification = await notifications_service.mark_read(db, current_user.id, id)
@@ -46,7 +46,7 @@ async def mark_read(id: uuid.UUID, db=Depends(get_db), current_user: User = Depe
 @router.post(
     "/notifications/read-all",
     status_code=204,
-    summary="Отметить все уведомления прочитанными",
+    summary="Mark all notifications as read",
 )
 async def mark_all_read(db=Depends(get_db), current_user: User = Depends(get_user)) -> None:
     await notifications_service.mark_all_read(db, current_user.id)
@@ -55,8 +55,8 @@ async def mark_all_read(db=Depends(get_db), current_user: User = Depends(get_use
 @router.delete(
     "/notifications/{id}",
     status_code=204,
-    summary="Удалить уведомление",
-    description="Удаляет одно уведомление текущего пользователя. 404, если не найдено или принадлежит другому пользователю.",
+    summary="Delete a notification",
+    description="Deletes a single notification belonging to the current user. 404 if not found or belongs to another user.",
 )
 async def delete_notification(id: uuid.UUID, db=Depends(get_db), current_user: User = Depends(get_user)) -> None:
     await notifications_service.delete_notification(db, current_user.id, id)
@@ -64,16 +64,16 @@ async def delete_notification(id: uuid.UUID, db=Depends(get_db), current_user: U
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, user: User | None = Depends(get_user_ws)) -> None:
-    # * Единая точка входа WS для всего приложения (уведомления сейчас, мессенджер — позже, тот же сокет).
-    # ! Закрываем ДО accept(), если авторизация не прошла — ASGI-сервер вернёт клиенту отказ хендшейка,
-    # ! а не резкий разрыв уже установленного соединения.
+    # * The single WS entry point for the whole app (notifications now, messenger later, same socket).
+    # ! We close BEFORE accept() if authorization fails — the ASGI server will return a handshake
+    # ! rejection to the client instead of abruptly dropping an already-established connection.
     if user is None:
         await websocket.close(code=1008)
         return
     await manager.connect(user.id, websocket)
     try:
         async for _ in websocket.iter_text():
-            pass  # * клиент ничего не обязан присылать — канал только для push от сервера
+            pass  # * the client isn't obligated to send anything — the channel is server-push only
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected: user %s", user.id)
     finally:

@@ -1,4 +1,4 @@
-# ORM-модель фичи family: одна markdown-история семьи на владельца графа.
+# ORM model for the family feature: one markdown family history per graph owner.
 import uuid
 from datetime import datetime
 

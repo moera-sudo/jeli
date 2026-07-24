@@ -1,4 +1,4 @@
-# Исключения фичи auth — наследники глобальных из src.exceptions.
+# Exceptions for the auth feature — subclasses of the global ones from src.exceptions.
 from src.exceptions import ConflictError, UnauthorizedError
 
 

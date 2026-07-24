@@ -1,4 +1,4 @@
-# Бизнес-логика фичи search: поиск профилей пользователей по ФИО + батч-обогащение person_id.
+# Business logic for the search feature: searching user profiles by full name + batch enrichment with person_id.
 import uuid
 
 from sqlalchemy import or_, select
@@ -9,13 +9,13 @@ from src.features.user.models import User
 
 
 def _escape_like(value: str) -> str:
-    # * Экранирует спецсимволы LIKE/ILIKE, чтобы пользовательский ввод не менял семантику паттерна.
+    # * Escapes LIKE/ILIKE special characters so user input can't alter the pattern's semantics.
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 async def search_users(db: AsyncSession, query: str, exclude_user_id: uuid.UUID, limit: int) -> list[User]:
-    # * Поиск по ФИО (без учёта регистра). Пустой/пробельный query — намеренно [] без похода в БД,
-    # * чтобы не отдавать случайный "топ пользователей" по пустому запросу.
+    # * Search by full name (case-insensitive). An empty/whitespace-only query intentionally returns
+    # * [] without hitting the DB, so we don't serve an arbitrary "top users" list on an empty query.
     stripped = query.strip()
     if not stripped:
         return []
@@ -37,8 +37,8 @@ async def search_users(db: AsyncSession, query: str, exclude_user_id: uuid.UUID,
 
 
 async def get_linked_person_ids(db: AsyncSession, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, uuid.UUID]:
-    # * Батч-версия graph_service.get_linked_person — избегает N+1 при обогащении списка результатов
-    # * поиска person_id (один запрос вместо одного на каждого найденного пользователя).
+    # * Batch version of graph_service.get_linked_person — avoids N+1 when enriching the search
+    # * results list with person_id (one query instead of one per found user).
     if not user_ids:
         return {}
     result = await db.execute(select(Person.linked_user_id, Person.id).where(Person.linked_user_id.in_(user_ids)))

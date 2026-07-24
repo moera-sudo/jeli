@@ -1,4 +1,4 @@
-# Pydantic-схемы фичи media.
+# Pydantic schemas for the media feature.
 from pydantic import BaseModel
 
 

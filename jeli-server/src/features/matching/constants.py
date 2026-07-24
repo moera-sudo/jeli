@@ -1,11 +1,11 @@
-# Пороги и веса алгоритма мэтчинга — см. docs/matching-algorhitm.md. Веса подобраны вручную,
-# без ML, откалиброваны на тестовых кейсах из раздела 8 доки.
+# Thresholds and weights of the matching algorithm — see docs/matching-algorhitm.md. Weights were tuned
+# by hand, without ML, calibrated against the test cases from section 8 of the doc.
 CANDIDATE_NAME_SIMILARITY_THRESHOLD = 0.6
 CANDIDATE_LIMIT = 200
 
 MAX_CHAIN_DEPTH = 10
 GEN_OFFSET_TOLERANCE = 2
-# * Порог отбора узла в цепочку — не задан в доке явно, введён как разумный минимум confidence.
+# * Threshold for selecting a node into a chain — not explicitly set in the doc, introduced as a reasonable minimum confidence.
 NODE_MATCH_MIN_CONFIDENCE = 0.4
 
 CHAIN_LENGTH_MULTIPLIER = {1: 0.35, 2: 0.65, 3: 0.90, 4: 1.0}
@@ -18,8 +18,8 @@ SOURCE_TRUST = {
     "archival_record": 1.0,
 }
 
-# * Реальная казахская диаспора (Монголия, Китай, Узбекистан, Россия) — миграция между этими странами
-# * не должна штрафоваться как "чужие", в отличие от произвольной пары стран.
+# * Real Kazakh diaspora (Mongolia, China, Uzbekistan, Russia) — migration between these countries
+# * should not be penalized as "foreign", unlike an arbitrary pair of countries.
 MIGRATION_PLAUSIBILITY: dict[tuple[str, str], float] = {
     ("KZ", "RU"): 0.6,
     ("RU", "KZ"): 0.6,
@@ -35,9 +35,9 @@ MIGRATION_PLAUSIBILITY_DEFAULT = 0.15
 MATCH_HIGH_CONFIDENCE_THRESHOLD = 0.75
 MATCH_POSSIBLE_MATCH_THRESHOLD = 0.45
 
-# * Частые казахские имена (нормализованные, lower) — не из доки, введено как страховка от того,
-# * что на маленьком хакатон-датасете объективно частое имя даёт 0 совпадений в БД и ошибочно
-# * получает name_rarity_score=1.0 ("уникальное"). Список best-effort, не претендует на полноту.
+# * Common Kazakh first names (normalized, lower) — not from the doc, introduced as a safeguard against
+# * an objectively common name getting 0 matches in the DB on a small hackathon dataset and incorrectly
+# * receiving name_rarity_score=1.0 ("unique"). Best-effort list, does not claim to be exhaustive.
 COMMON_KAZAKH_FIRST_NAMES: set[str] = {
     "nurlan", "нурлан", "yerlan", "ерлан", "arman", "арман", "alibek", "алибек",
     "bekzat", "бекзат", "dias", "диас", "daniyar", "данияр", "azamat", "азамат",
@@ -51,7 +51,7 @@ COMMON_KAZAKH_FIRST_NAMES: set[str] = {
     "nazerke", "назерке", "sabina", "сабина", "aisha", "айша",
 }
 
-# * Порог значимого изменения score для отправки уведомления (docs/matching-algorhitm.md, раздел 5).
+# * Threshold for a significant score change to trigger a notification (docs/matching-algorhitm.md, section 5).
 SIGNIFICANT_SCORE_DELTA = 0.15
 
 RU_BONUS = 0.08

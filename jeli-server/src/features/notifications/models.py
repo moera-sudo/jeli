@@ -1,5 +1,5 @@
-# ORM-модель Notification: персональные события пользователя, доставляемые через WebSocket и
-# сохраняемые в БД для истории/оффлайн-доступа.
+# ORM model Notification: per-user events delivered over WebSocket and persisted in the DB
+# for history/offline access.
 import uuid
 from datetime import datetime
 

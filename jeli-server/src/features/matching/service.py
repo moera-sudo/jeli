@@ -1,5 +1,5 @@
-# Пайплайн мэтчинга (5 этапов) — см. docs/matching-algorhitm.md. Полный пересчёт по одному person'у
-# при любом create/edit, без частичного recompute (упрощение, приемлемое для маленького хакатон-датасета).
+# Matching pipeline (5 stages) — see docs/matching-algorhitm.md. Full recompute for a single person
+# on any create/edit, no partial recompute (a simplification acceptable for a small hackathon dataset).
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 
 async def find_candidates(db: AsyncSession, person: Person) -> list[Person]:
-    # * Stage 1 — pg_trgm similarity + мягкий гео-префильтр (сортировка, НЕ отсечение).
+    # * Stage 1 — pg_trgm similarity + soft geo-prefilter (sorting, NOT cutoff).
     sql = text(
         """
         SELECT p2.id
@@ -118,8 +118,8 @@ async def align_and_score(
     candidate: Person,
     rarity_cache: dict[str, int],
 ) -> tuple[float, str, dict]:
-    # * Stage 2+3+4+5 для ОДНОЙ пары person/candidate. person_ancestors переиспользуется вызывающей
-    # * стороной между всеми кандидатами одного person'а (не пересчитывается заново на каждого).
+    # * Stage 2+3+4+5 for ONE person/candidate pair. person_ancestors is reused by the caller
+    # * across all candidates of the same person (not recomputed for each one).
     candidate_ancestors = await graph_service.get_ancestors_with_depth(db, candidate.id)
     person_by_depth = _group_by_depth(person_ancestors)
     candidate_by_depth = _group_by_depth(candidate_ancestors)
@@ -128,9 +128,9 @@ async def align_and_score(
     persons_by_id = await _load_persons_by_id(db, all_ids)
 
     node_matches: list[NodeMatch] = []
-    # ! Кандидатский узел, уже использованный на одном уровне поколения, исключается из следующих —
-    # ! иначе один и тот же предок (попадающий в несколько перекрывающихся окон допуска ±2) может
-    # ! "закрыть" сразу несколько соседних уровней и искусственно раздуть chain_length.
+    # ! A candidate node already used at one generation level is excluded from the following ones —
+    # ! otherwise the same ancestor (falling into several overlapping ±2 tolerance windows) could
+    # ! "cover" several neighboring levels at once and artificially inflate chain_length.
     used_candidate_ids: set[uuid.UUID] = set()
 
     for gen in range(0, MAX_CHAIN_DEPTH + 1):
@@ -139,8 +139,8 @@ async def align_and_score(
             continue
 
         if gen == 0:
-            # * gen=0 — это и есть якорная пара из Stage 1: сравниваем ТОЛЬКО person с candidate,
-            # * без допуска ±2 (иначе "совпадение" может оказаться с отцом/дедом candidate, а не с ним).
+            # * gen=0 is the anchor pair from Stage 1 itself: compare person ONLY against candidate,
+            # * with no ±2 tolerance (otherwise the "match" could turn out to be with candidate's father/grandfather, not candidate itself).
             candidate_side_ids = {candidate.id}
         else:
             candidate_side_ids = set()
@@ -158,7 +158,7 @@ async def align_and_score(
             for pb_id in candidate_side_ids:
                 pb = persons_by_id[pb_id]
                 if pa.gender != pb.gender:
-                    continue  # ! hard reject: пол должен совпадать
+                    continue  # ! hard reject: gender must match
                 gen_b = 0 if pb_id == candidate.id else candidate_ancestors[pb_id]
                 confidence = node_confidence(pa, pb, gen_a, gen_b, rarity_count)
                 if confidence >= NODE_MATCH_MIN_CONFIDENCE:
@@ -167,14 +167,14 @@ async def align_and_score(
         if not confident_pairs:
             continue
         best = max(confident_pairs, key=lambda m: m.confidence)
-        # * Различные person-side узлы с уверенным совпадением на этом уровне (напр. отец и мать) —
-        # * а не количество пар (один предок × N кандидатов в допуске ±2 — это не N сиблингов).
+        # * Distinct person-side nodes with a confident match at this level (e.g. father and mother) —
+        # * not the number of pairs (one ancestor × N candidates within the ±2 tolerance is not N siblings).
         best.sibling_count = len({m.person_a.id for m in confident_pairs})
         node_matches.append(best)
         used_candidate_ids.add(best.person_b.id)
 
     if not any(m.gen == 0 for m in node_matches):
-        # * Даже сама пара-кандидат из Stage 1 не прошла hard-reject/порог confidence — discard сразу.
+        # * Even the candidate pair itself from Stage 1 didn't pass the hard-reject/confidence threshold — discard right away.
         return 0.0, MATCH_STATUS_DISCARD, {"reason": "root_pair_below_threshold"}
 
     c_score = chain_score(node_matches)
@@ -187,9 +187,9 @@ async def align_and_score(
     else:
         status = MATCH_STATUS_DISCARD
 
-    # * evidence всегда подписывается в том же порядке, что канонические колонки MatchCandidate
-    # * (person_a/person_b по str(id)) — иначе при развороте канонического порядка подписи внутри
-    # * evidence.chain перестают соответствовать match.person_a_id/match.person_b_id.
+    # * evidence is always labeled in the same order as the canonical MatchCandidate columns
+    # * (person_a/person_b by str(id)) — otherwise, if the canonical order gets flipped, the labels inside
+    # * evidence.chain stop matching match.person_a_id/match.person_b_id.
     canonical_a, _ = _canonical_order(person, candidate)
     swap_evidence = canonical_a.id != person.id
 
@@ -255,8 +255,8 @@ async def _upsert_match(db: AsyncSession, person: Person, candidate: Person, fin
     now = datetime.now(timezone.utc)
 
     if match is not None and (match.confirmed_at is not None or match.person_a_rejected or match.person_b_rejected):
-        # ! Подтверждённое/отклонённое обеими сторонами решение — финальное. Фоновый пересчёт
-        # ! не имеет права тихо перезаписать его score/status (например, обратно на discard).
+        # ! A decision confirmed/rejected by both sides is final. A background recompute
+        # ! has no right to silently overwrite its score/status (e.g. back to discard).
         logger.info("Match %s already resolved (confirmed/rejected) — skipping recompute overwrite", match.id)
         return
 
@@ -298,21 +298,21 @@ async def recompute_for_person(db: AsyncSession, person_id: uuid.UUID) -> None:
 
     for candidate in candidates:
         if candidate.gender != person.gender:
-            continue  # ! hard reject: не сравниваем и не создаём MatchCandidate вообще
+            continue  # ! hard reject: don't compare and don't create a MatchCandidate at all
         final_score, status, evidence = await align_and_score(db, person, person_ancestors, candidate, rarity_cache)
         try:
             await _upsert_match(db, person, candidate, final_score, status, evidence)
         except IntegrityError:
-            # ! Гонка: параллельный пересчёт другой стороны этой же пары уже вставил строку между
-            # ! нашим select и insert (уникальный констрейнт на пару). Откатываем и переходим к
-            # ! следующему кандидату — запись всё равно корректно создана параллельным таском.
+            # ! Race: a concurrent recompute for the other side of this same pair already inserted a row between
+            # ! our select and insert (unique constraint on the pair). Roll back and move on to the
+            # ! next candidate — the row was still correctly created by the concurrent task.
             await db.rollback()
             logger.warning("Match upsert race for pair (%s, %s) — skipped, handled by concurrent task", person.id, candidate.id)
 
 
 async def recompute_for_person_task(person_id: uuid.UUID) -> None:
-    # * Вызывается из BackgroundTasks ПОСЛЕ отправки HTTP-ответа — открывает СВОЮ сессию, т.к.
-    # * request-scoped сессия graph-роутера к этому моменту уже закрыта.
+    # * Called from BackgroundTasks AFTER the HTTP response has been sent — opens its OWN session, since
+    # * the graph router's request-scoped session is already closed by this point.
     async with AsyncSessionLocal() as db:
         try:
             await recompute_for_person(db, person_id)

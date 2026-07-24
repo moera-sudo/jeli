@@ -1,54 +1,53 @@
 # Jeli
 
-**Краудсорсингая платформа восстановления родословной**
+**A crowdsourced platform for reconstructing family trees**
 
-Контрибьютуторы 
+Contributors
 - https://github.com/moera-sudo
 - https://github.com/itszhdi
 
-Проект **Jeli** выполнен в рамках хакатона **TechVision** в период с 17 по 21 июля.
+The **Jeli** project was built during the **TechVision** hackathon, held from July 17 to July 21.
 
-# Описание серверной части
+# Backend Description
 
-## Стэк
+## Stack
 
-Серверная часть проекта выполнена целиком на языке программирования **Python 3.14**
-с использованием веб-фреймворка **FastAPI**, ключевые зависимости проекта представляют из себя
+The backend is built entirely in **Python 3.14** using the **FastAPI** web framework. The project's key dependencies are:
 
-1) UV - Используемый пакетный менеджер для Python
-2) FastAPI - Веб-Фреймворк
-3) SQLAlchemy - ОРМ для взаимодействия с базой данных
-4) asyncpg - Асинхронный драйвер для взаимодействия с базой данных
-5) rapidfuzz - Библиотека нечёткого сравнения строк, используется в алгоритме мэтчинга
-   для оценки схожести ФИО между узлами разных деревьев (`fuzz.ratio`)
-6) alembic - инструмент миграций БД
-7) pyjwt + passlib/bcrypt - выпуск/проверка JWT-токенов и хеширование паролей (аутентификация)
-8) python-multipart - обработка multipart-запросов (загрузка файлов в фиче media)
+1) UV - the Python package manager used in the project
+2) FastAPI - the web framework
+3) SQLAlchemy - the ORM for database interaction
+4) asyncpg - the asynchronous driver for database interaction
+5) rapidfuzz - a fuzzy string matching library, used in the matching algorithm
+   to score full-name similarity between nodes from different trees (`fuzz.ratio`)
+6) alembic - the database migration tool
+7) pyjwt + passlib/bcrypt - issuing/verifying JWT tokens and password hashing (authentication)
+8) python-multipart - handling multipart requests (file uploads in the media feature)
 
-### Дополнительные инструменты
-- PostgreSQL - Основная база данных (включая расширение `pg_trgm` - нечёткий поиск по имени в мэтчинге)
-- docker/docker-compose - Инструменты контейнеризации для запуска проекта
-- make - Утилита менеджера консольных команд для удобного управления проектом. Если make на ОС недоступен - придется напрямую вставлять команды из Makefile
-- bruno - Инструмент API тестирования эндпоинтов. Вся Bruno коллекция доступна на GitHub в Jeli-Bruno
+### Additional tools
+- PostgreSQL - the primary database (including the `pg_trgm` extension - fuzzy name search in matching)
+- docker/docker-compose - containerization tools for running the project
+- make - a console command runner utility for convenient project management. If make is unavailable on your OS, you'll need to run the commands from the Makefile directly
+- bruno - an API endpoint testing tool. The entire Bruno collection is available on GitHub in Jeli-Bruno
 
-## Архитектура
+## Architecture
 
-Проект представляет из себя клиент-серверную монолитную архитектуру: FastAPI-бэкенд + PostgreSQL,
-поднимаются вместе через Docker Compose. Клиентская часть разворачивается отдельно. Документация ко всем эндпоинтам доступна при запуске проекта по машруту `/api/docs` и `/api/redoc`. 
+The project follows a client-server monolithic architecture: a FastAPI backend + PostgreSQL,
+both spun up together via Docker Compose. The client is deployed separately. Documentation for all endpoints is available once the project is running, at `/api/docs` and `/api/redoc`.
 
-### 1. База данных, FastAPI и структура проекта
+### 1. Database, FastAPI, and Project Structure
 
-Верхнеуровневая структура `src/`:
+Top-level structure of `src/`:
 
 ```
 src/
-├── config/            # settings.py (Pydantic Settings из .env), database.py (async engine/session), logging.py
-├── dependencies.py     # общие FastAPI-зависимости - get_user, get_user_ws
-├── exceptions.py       # базовая иерархия AppException + единый обработчик ошибок
-├── models.py           # агрегатор ORM-моделей всех фич (нужен Alembic для autogenerate)
-├── router.py            # агрегатор роутов всех фич под общим префиксом /api
-├── ws_manager.py        # синглтон ConnectionManager - общий WebSocket-менеджер
-├── main.py             # точка входа FastAPI-приложения
+├── config/            # settings.py (Pydantic Settings from .env), database.py (async engine/session), logging.py
+├── dependencies.py     # shared FastAPI dependencies - get_user, get_user_ws
+├── exceptions.py       # base AppException hierarchy + unified error handler
+├── models.py           # ORM model aggregator for all features (needed by Alembic for autogenerate)
+├── router.py            # route aggregator for all features under the common /api prefix
+├── ws_manager.py        # ConnectionManager singleton - shared WebSocket manager
+├── main.py             # FastAPI application entry point
 └── features/
     ├── auth/
     ├── user/
@@ -61,28 +60,29 @@ src/
     └── search/
 ```
 
-Каждая фича в `features/` - самодостаточный модуль со своим `router.py` (эндпоинты), `schemas.py`
-(Pydantic-модели запросов/ответов), `models.py` (ORM-модели), `service.py` (бизнес-логика),
-`exceptions.py` (свои исключения, наследуются от общей иерархии `src/exceptions.py`),
-`constants.py` и `utils.py` - без единой "God"-папки на весь проект. Такое разделение:
+Each feature under `features/` is a self-contained module with its own `router.py` (endpoints), `schemas.py`
+(Pydantic request/response models), `models.py` (ORM models), `service.py` (business logic),
+`exceptions.py` (feature-specific exceptions, inheriting from the shared hierarchy in `src/exceptions.py`),
+`constants.py`, and `utils.py` - with no single project-wide "God" folder. This separation:
 
-- **не даёт коду фич смешиваться** - правки в `graph` не тянут за собой случайных изменений в
-  `matching` или `messenger`, у каждой фичи чётко определены зависимости от других (например,
-  `matching` зависит от `graph`, но не наоборот - это соблюдается по всему проекту, чтобы не
-  возникало циклических импортов);
-- **упрощает онбординг и ревью** - разработчик, открывший `features/media/`, сразу видит весь
-  контракт фичи (что принимает, что хранит, что отдаёт), не прыгая по всему репозиторию;
-- **масштабируется линейно** - добавление новой фичи (как `family` или `search` на позднем этапе
-  разработки) не требует трогать существующие модули, только зарегистрировать роутер/модели в
+- **keeps feature code from mixing** - changes in `graph` don't drag along accidental changes in
+  `matching` or `messenger`; each feature has clearly defined dependencies on others (for example,
+  `matching` depends on `graph`, but not the other way around - this rule is enforced throughout the
+  project to avoid circular imports);
+- **simplifies onboarding and review** - a developer opening `features/media/` immediately sees the
+  entire feature contract (what it accepts, what it stores, what it returns) without jumping around
+  the whole repository;
+- **scales linearly** - adding a new feature (like `family` or `search` at a later development
+  stage) doesn't require touching existing modules, only registering the router/models in
   `src/router.py`/`src/models.py`;
-- **`dependencies.py`** - место для зависимостей, нужных СРАЗУ нескольким фичам (`get_user` -
-  универсальная проверка Bearer-токена, `get_user_ws` - то же самое для WebSocket через
-  query-параметр `?token=`, т.к. браузерный `WebSocket` API не умеет слать заголовки);
-- **`exceptions.py`** - все доменные ошибки наследуются от `AppException` с собственным
-  `status_code`, единый глобальный обработчик превращает их в консистентный JSON
-  `{"detail": "..."}` - фичам не нужно вручную формировать HTTP-ответы на ошибки.
+- **`dependencies.py`** - a place for dependencies needed by SEVERAL features at once (`get_user` -
+  a universal Bearer token check, `get_user_ws` - the same thing for WebSocket via the
+  `?token=` query parameter, since the browser `WebSocket` API can't send headers);
+- **`exceptions.py`** - all domain errors inherit from `AppException` with their own
+  `status_code`; a single global handler turns them into a consistent JSON
+  `{"detail": "..."}` response - features don't need to manually build HTTP error responses.
 
-#### Схема базы данных (ERD)
+#### Database Schema (ERD)
 
 ```mermaid
 erDiagram
@@ -111,7 +111,7 @@ erDiagram
         string last_name "nullable"
         string first_name "nullable"
         string patronymic "nullable"
-        string avatar_url "default-заглушка, ссылка вида /api/media/{id}"
+        string avatar_url "default placeholder, link like /api/media/{id}"
         string gender "nullable"
         string current_city "nullable"
         string current_country "nullable"
@@ -131,11 +131,11 @@ erDiagram
         uuid id PK
         uuid owner_user_id FK
         uuid linked_user_id FK "nullable, unique"
-        uuid origin_label "union-find кластер"
+        uuid origin_label "union-find cluster"
         string last_name "nullable"
         string first_name "nullable"
         string patronymic "nullable"
-        string normalized_name "lower+trim, для pg_trgm"
+        string normalized_name "lower+trim, for pg_trgm"
         string gender
         string avatar_url "nullable"
         bool is_alive
@@ -251,115 +251,118 @@ erDiagram
     }
 ```
 
-`MEDIA` не имеет входящих внешних ключей - на неё ссылаются просто строкой `/api/media/{id}` из
-полей `avatar_url`/`file_url`/`content` (markdown семьи), не через FK. Файл лежит на диске под
-именем `id`, `content_type` в БД нужен только чтобы `GET /media/{id}` отдал верный `Content-Type`.
+`MEDIA` has no incoming foreign keys - it is referenced simply as a string `/api/media/{id}` from
+the `avatar_url`/`file_url`/`content` (family markdown) fields, not via FK. The file is stored on disk
+under the name `id`; `content_type` in the DB is needed only so that `GET /media/{id}` returns the
+correct `Content-Type`.
 
 ### 2. Auth, Family, Media, Search, User
 
-- **auth** - отвечает за создание аккаунта и выдачу сессии, ничего больше не знает о графе или
-  профиле. Регистрация нарочно устроена в двух вариантах - короткая (только email, пароль, ФИО) и
-  полная (сразу с городом, датой рождения, родовыми признаками и т.д.), чтобы не заставлять
-  человека проходить многошаговую анкету, если он и так готов заполнить всё сразу. Пароль никогда
-  не хранится в открытом виде - только bcrypt-хэш. Сессия полностью stateless: и access-, и
-  refresh-токен - обычные JWT, сервер не хранит списков активных сессий и не может их досрочно
-  отозвать - обновление токена - это просто проверка подписи старого refresh-токена и выпуск новой
-  пары. Код приглашения в дерево можно передать прямо при регистрации, чтобы человек сразу
-  зарегистрировался и присоединился к своему узлу одним действием, а не двумя отдельными.
-- **user** - хранит личный профиль аккаунта (контакты, гео, дата рождения, родовые признаки,
-  биография) отдельно от узла в дереве - это два разных объекта, потому что один и тот же человек
-  может ещё не иметь своего узла в графе или, наоборот, у узла может не быть привязанного аккаунта.
-  Именно данные из этого профиля считаются авторитетными: когда человек присоединяется к своему
-  узлу по коду, они побеждают то, что за него вписал владелец дерева (см. раздел про Graph).
-  Удаление аккаунта не происходит "в вакууме" - если пользователь был единственным владельцем
-  графа, в котором есть другие зарегистрированные родственники, система сначала требует передать
-  им владение, иначе отказывает.
-- **family** - совместная письменная история рода, а не личный дневник каждого пользователя: одна
-  запись **на весь граф**, а не на человека. Смысл в том, что все члены одной семьи - владелец
-  графа, коллабораторы, привязанные к узлам родственники - читают и правят один и тот же текст, и
-  результат виден всем одинаково, а не расходится на версии. В текст истории можно вставлять
-  фотографии через общую фичу media.
-- **media** - минимальный слой хранения файлов, не самостоятельная фича, а обслуживающая
-  прослойка для остальных (аватарки, фото в истории семьи). Специально устроена так, чтобы
-  отдавать уже загруженный файл без авторизации - иначе обычный `<img>` на фронтенде просто не
-  показал бы картинку, ведь браузер не прикладывает Bearer-токен к загрузке изображений. Отдельно
-  есть укороченный путь "загрузить и сразу привязать" - одним вызовом можно поставить аватар и
-  себе, и любому узлу дерева, включая узел уже умершего человека: наличие фотографии в семейном
-  архиве никак не зависит от того, жив ли человек.
-- **search** - способ найти конкретного родственника в системе по имени, когда под рукой ещё нет
-  его инвайт-кода. Ищет по нечёткому вхождению подстроки в ФИО зарегистрированных пользователей
-  (не по узлам дерева), никогда не находит самого себя, и сразу сообщает, привязан ли найденный
-  человек к какому-то узлу - именно это позволяет показать кнопку "написать" прямо в результатах
-  поиска, не делая для этого отдельный запрос.
+- **auth** - responsible for account creation and issuing sessions; it knows nothing else about
+  the graph or the profile. Registration is deliberately available in two variants - a short one
+  (email, password, full name only) and a full one (including city, date of birth, ethnic
+  attributes, etc. right away), so as not to force the user through a multi-step questionnaire if
+  they're already ready to fill everything in at once. The password is never stored in plain text -
+  only as a bcrypt hash. The session is fully stateless: both the access and refresh tokens are
+  plain JWTs; the server keeps no list of active sessions and cannot revoke them early - refreshing a
+  token is simply verifying the old refresh token's signature and issuing a new pair. A tree invite
+  code can be supplied right at registration, so a person can register and join their own node in a
+  single action instead of two separate ones.
+- **user** - stores the account's personal profile (contacts, geography, date of birth, ethnic
+  attributes, biography) separately from the tree node - these are two different objects, because
+  the same person may not yet have their own node in the graph, or conversely a node may have no
+  linked account. Data from this profile is treated as authoritative: when a person joins their node
+  via a code, it overrides whatever the tree owner had entered on their behalf (see the Graph
+  section). Account deletion doesn't happen "in a vacuum" - if the user was the sole owner of a
+  graph that contains other registered relatives, the system first requires ownership to be
+  transferred to one of them, otherwise it refuses.
+- **family** - a shared written family history, not a personal diary for each user: one entry
+  **per whole graph**, not per person. The idea is that all members of one family - the graph owner,
+  collaborators, relatives linked to nodes - read and edit the same text, and the result is visible
+  identically to everyone rather than diverging into separate versions. Photos can be embedded in the
+  history text via the shared media feature.
+- **media** - a minimal file storage layer, not a standalone feature but a supporting layer for
+  the others (avatars, photos in the family history). It's deliberately built to serve an already
+  uploaded file without authorization - otherwise a plain `<img>` tag on the frontend simply wouldn't
+  display the picture, since the browser doesn't attach a Bearer token to image loads. There's also
+  a shortcut path for "upload and immediately attach" - a single call can set an avatar both for
+  yourself and for any tree node, including the node of a deceased person: having a photo in the
+  family archive doesn't depend on whether the person is alive.
+- **search** - a way to find a specific relative in the system by name, when you don't yet have
+  their invite code. It searches by fuzzy substring match against the full names of registered users
+  (not tree nodes), never returns the searcher themselves, and immediately reports whether the found
+  person is linked to any node - this is exactly what lets the UI show a "message" button right in
+  the search results, without a separate request.
 
-### 3. WebSocket, чаты и уведомления
+### 3. WebSocket, Chats, and Notifications
 
-Всё real-time приложение держится на **одном** WebSocket-эндпоинте - `GET /api/ws?token=...` -
-и одном синглтоне `ws_manager.ConnectionManager` (`src/ws_manager.py`): словарь `user_id -> активное
-соединение`, максимум одно соединение на пользователя. Авторизация - access-JWT в
-query-параметре `token`, а не в заголовке `Authorization`: обычный браузерный `WebSocket` API не
-умеет слать кастомные заголовки при хендшейке, поэтому токен передаётся в URL. Если токен
-отсутствует/невалиден - соединение закрывается кодом `1008` **до** `accept()`, чтобы клиент получил
-честный отказ хендшейка, а не разрыв уже установленного соединения.
+The entire real-time application rests on a **single** WebSocket endpoint - `GET /api/ws?token=...` -
+and one `ws_manager.ConnectionManager` singleton (`src/ws_manager.py`): a dictionary of `user_id ->
+active connection`, at most one connection per user. Authorization uses the access JWT in the
+`token` query parameter rather than the `Authorization` header: the standard browser `WebSocket` API
+can't send custom headers during the handshake, so the token is passed in the URL. If the token is
+missing or invalid, the connection is closed with code `1008` **before** `accept()`, so the client
+gets an honest handshake rejection rather than an already-established connection being torn down.
 
-Все события, независимо от того, какая фича их породила, идут через один и тот же сокет и
-различаются только полем `"type"` в JSON-теле - это и называется мультиплексированием:
+All events, regardless of which feature produced them, travel through the same socket and are
+distinguished only by the `"type"` field in the JSON body - this is what's called multiplexing:
 
 ```jsonc
 {"type": "message", "message": {...}}          // messenger
 {"type": "notification", "notification": {...}} // notifications
 ```
 
-Канал строго push-only от сервера: клиент ничего не обязан присылать, всё, что он всё же пришлёт,
-сервер просто игнорирует (`async for _ in websocket.iter_text(): pass`).
+The channel is strictly server push-only: the client isn't required to send anything, and
+whatever it does send is simply ignored by the server (`async for _ in websocket.iter_text(): pass`).
 
-**Notifications** (`src/features/notifications/`) - персональные события пользователя.
-`create_notification()` **всегда** сохраняет запись в БД (для истории и офлайн-доступа) и
-**дополнительно** пушит её через `ConnectionManager.send_to_user`, если получатель сейчас онлайн -
-если нет, событие просто ждёт в истории до следующего `GET /notifications`. Типы уведомлений
-рождаются в других фичах через события: новый мэтч, заметное изменение скора мэтча, новое
-сообщение в чате. Эндпоинты: `GET /notifications` (список, есть фильтр `unread_only`),
+**Notifications** (`src/features/notifications/`) - a user's personal events.
+`create_notification()` **always** saves a record to the DB (for history and offline access) and
+**additionally** pushes it via `ConnectionManager.send_to_user` if the recipient is currently online -
+if not, the event simply waits in the history until the next `GET /notifications`. Notification types
+originate in other features through events: a new match, a noticeable change in a match's score, a
+new chat message. Endpoints: `GET /notifications` (list, with an `unread_only` filter),
 `POST /notifications/{id}/read`, `POST /notifications/read-all`, `DELETE /notifications/{id}`.
 
-**Messenger** (`src/features/messenger/`) - простые 1-на-1 текстовые чаты поверх того же сокета.
-`Chat.user_a_id`/`user_b_id` хранятся в каноническом порядке (по `str(id)`, та же схема, что у
-`MatchCandidate.person_a_id/person_b_id`) - это делает `POST /chats` идемпотентным: повторный вызов
-с тем же `person_id` вернёт уже существующий чат, а не создаст дубликат, независимо от того, кто из
-двоих инициировал разговор первым. При отправке сообщения (`POST /chats/{id}/messages`) сервис:
-1. сохраняет `Message` в БД;
-2. пушит получателю (если онлайн) `{"type": "message", ...}` - для мгновенной отрисовки в открытом
-   чате;
-3. параллельно создаёт `notifications`-уведомление `new_message` - оно попадёт в историю
-   уведомлений и придёт тем же сокетом с `{"type": "notification", ...}`, независимо от того,
-   открыт ли у получателя именно этот чат прямо сейчас.
+**Messenger** (`src/features/messenger/`) - simple 1-on-1 text chats on top of the same socket.
+`Chat.user_a_id`/`user_b_id` are stored in canonical order (by `str(id)`, the same scheme as
+`MatchCandidate.person_a_id/person_b_id`) - this makes `POST /chats` idempotent: calling it again
+with the same `person_id` returns the already-existing chat instead of creating a duplicate,
+regardless of which of the two initiated the conversation first. When sending a message
+(`POST /chats/{id}/messages`) the service:
+1. saves the `Message` to the DB;
+2. pushes `{"type": "message", ...}` to the recipient (if online) - for instant rendering in an open
+   chat;
+3. in parallel creates a `new_message` notification via `notifications` - it lands in the
+   notification history and arrives over the same socket as `{"type": "notification", ...}`,
+   regardless of whether the recipient currently has this exact chat open.
 
-Остальные эндпоинты: `GET /chats` (список с последним сообщением и `peer_user_id` - чтобы фронтенд
-мог сразу открыть профиль собеседника), `GET /chats/{id}/messages` (история), `DELETE /chats/{id}`
-(каскадно удаляет и сам чат, и все сообщения).
+Other endpoints: `GET /chats` (a list with the last message and `peer_user_id` - so the frontend
+can immediately open the interlocutor's profile), `GET /chats/{id}/messages` (history),
+`DELETE /chats/{id}` (cascades to delete both the chat itself and all messages).
 
-### 4. Graph и Matching
+### 4. Graph and Matching
 
-#### 4.1. Устройство графа
+#### 4.1. Graph Design
 
-Отдельной сущности "граф" в БД нет - граф пользователя это просто множество узлов `Person` с общим
-`owner_user_id`, всё остальное - рёбра между ними. Ключевые инварианты:
+There is no separate "graph" entity in the DB - a user's graph is simply the set of `Person`
+nodes sharing a common `owner_user_id`; everything else is edges between them. Key invariants:
 
-- `Relationship.type = "child_of"` направлен **ребёнок → родитель** (`from_person_id` = ребёнок).
-  Максимум 2 ребра `child_of` "от себя" на узел (`MAX_PARENTS_PER_PERSON = 2`).
-- `generation` (глубина/поколение) нигде не хранится - считается на лету рекурсивным CTE от точки
-  обзора при каждом запросе.
-- `origin_label` - метка кластера (union-find). Все узлы одной изначально несвязанной ветки имеют
-  одинаковую метку; при подтверждённом браке или мэтче весь компонент одной стороны перекрашивается
-  в метку другой - без физического слияния записей.
-- Три уровня прав на узел: владелец графа (`owner_user_id`) - полный доступ; коллаборатор
-  (`graph_collaborators`) - доступ ко всему графу владельца, но им можно назначить только уже
-  привязанный к живому аккаунту узел; сам живой человек (`linked_user_id == текущий пользователь`) -
-  может редактировать свой собственный узел, даже не будучи владельцем графа. Чтение графа
-  полностью открыто любому авторизованному пользователю - закрыты только мутации.
+- `Relationship.type = "child_of"` is directed **child → parent** (`from_person_id` = the child).
+  A maximum of 2 outgoing `child_of` edges per node (`MAX_PARENTS_PER_PERSON = 2`).
+- `generation` (depth/generation) is not stored anywhere - it's computed on the fly with a
+  recursive CTE from the viewpoint on every request.
+- `origin_label` - a cluster label (union-find). All nodes of one originally disconnected branch
+  share the same label; on a confirmed marriage or match, the entire component on one side is
+  relabeled to the other side's label - without physically merging records.
+- There are three permission levels on a node: the graph owner (`owner_user_id`) - full access;
+  a collaborator (`graph_collaborators`) - access to the owner's entire graph, though only a node
+  already linked to a live account can be assigned as one; the living person themselves
+  (`linked_user_id == current user`) - can edit their own node even without being the graph owner.
+  Reading the graph is fully open to any authenticated user - only mutations are restricted.
 
-**Обход предков/поколений - правило супруга.** Один и тот же волновой алгоритм (`_wave_traverse`)
-используется и для `GET /graph` (с ограничением глубины), и для `household-graph` (без
-ограничения):
+**Traversing ancestors/generations - the spouse rule.** The same wave algorithm
+(`_wave_traverse`) is used both for `GET /graph` (with a depth limit) and for `household-graph`
+(unlimited):
 
 ```mermaid
 sequenceDiagram
@@ -368,67 +371,67 @@ sequenceDiagram
     participant S as graph/service._wave_traverse
     participant DB as PostgreSQL
 
-    C->>R: GET /graph?focus={id}&depth=n (или /household-graph, depth=∞)
+    C->>R: GET /graph?focus={id}&depth=n (or /household-graph, depth=∞)
     R->>S: _wave_traverse(seed={focus}, max_iterations)
-    loop пока frontier не пуст и iterations < max_iterations
+    loop while frontier is non-empty and iterations < max_iterations
         S->>DB: SELECT relationships WHERE type=child_of AND from_person_id IN frontier
-        DB-->>S: рёбра "вверх" (к родителям)
+        DB-->>S: edges "up" (to parents)
         S->>DB: SELECT relationships WHERE type=child_of AND to_person_id IN frontier
-        DB-->>S: рёбра "вниз" (к детям - сиблинги/племянники тоже попадают)
+        DB-->>S: edges "down" (to children - siblings/nephews and nieces get included too)
         S->>DB: SELECT relationships WHERE type=spouse_of AND (from/to) IN frontier
-        DB-->>S: рёбра брака
-        alt marriage_end_reason IS NULL (брак действующий)
-            S->>S: супруг добавляется в next_frontier - обход ПРОДОЛЖИТСЯ через его предков/потомков
+        DB-->>S: marriage edges
+        alt marriage_end_reason IS NULL (marriage still active)
+            S->>S: spouse is added to next_frontier - traversal CONTINUES through their ancestors/descendants
         else marriage_end_reason = divorce/widowed
-            S->>S: супруг добавляется листом - БЕЗ рекурсии в его семью
+            S->>S: spouse is added as a leaf - WITHOUT recursing into their family
         end
-        S->>S: next_frontier -> frontier, generation[id] = глубина от focus
+        S->>S: next_frontier -> frontier, generation[id] = depth from focus
     end
     S->>DB: SELECT persons WHERE id IN generation.keys()
-    DB-->>S: узлы с вычисленным generation
+    DB-->>S: nodes with computed generation
     S-->>R: GraphResponse{persons[], relationships[]}
     R-->>C: 200
 ```
 
-Действующий брак продолжает обход через супруга (подтягивая всю его линию - так два независимо
-созданных дерева "сливаются" для отображения после брака между ними), расторгнутый - обрывает его
-на уровне листа, без рекурсии в его семью.
+An active marriage continues the traversal through the spouse (pulling in their entire line -
+this is how two independently created trees "merge" for display once there's a marriage between
+them), while a dissolved one cuts it off at the leaf level, without recursing into their family.
 
-**Присоединение по инвайт-коду - приоритет данных самого человека.** Когда владелец заранее
-заводит живого родственника вручную, а тот позже регистрируется и присоединяется по коду -
-данные, которые человек только что сам указал о себе при регистрации, побеждают то, что вписал
-владелец:
+**Joining via invite code - the person's own data takes priority.** When an owner manually
+creates a node for a living relative in advance, and that person later registers and joins via the
+code, the data the person just entered about themselves at registration overrides what the owner had
+entered:
 
 ```mermaid
 sequenceDiagram
     actor Owner
-    actor RealPerson as Реальный человек
+    actor RealPerson as Real Person
     participant R as graph/router
     participant S as graph/service.link_existing_person_by_invite_code
     participant DB as PostgreSQL
 
-    Owner->>R: POST /persons {last_name: "как я думаю", ...} (заводит узел заранее)
+    Owner->>R: POST /persons {last_name: "as I imagine it", ...} (creates a node in advance)
     Owner->>R: POST /persons/{id}/invite-code
-    R-->>Owner: "ABCD1234" (передаётся вне приложения)
+    R-->>Owner: "ABCD1234" (shared outside the app)
 
-    RealPerson->>R: POST /auth/register {last_name: "как есть на самом деле", ...}
+    RealPerson->>R: POST /auth/register {last_name: "as it actually is", ...}
     RealPerson->>R: POST /graph/join {invite_code: "ABCD1234"}
     R->>S: link_existing_person_by_invite_code(user, code)
     S->>S: person.linked_user_id = user.id
     loop last_name, first_name, patronymic, gender, birth_country, ru, tribe, zhuz, description
-        alt у user поле заполнено
-            S->>S: person[field] = user[field] - данные аккаунта ПОБЕЖДАЮТ то, что вписал owner
-        else у user поле пусто
-            S->>S: user[field] = person[field] - как раньше, подтягивается с узла на профиль
+        alt user's field is filled in
+            S->>S: person[field] = user[field] - account data OVERRIDES what the owner entered
+        else user's field is empty
+            S->>S: user[field] = person[field] - as before, pulled from the node onto the profile
         end
     end
-    S->>S: пересчитать normalized_name, если менялось ФИО
+    S->>S: recompute normalized_name if the full name changed
     S->>DB: commit
     S-->>RealPerson: Person{..., linked_user_id: user.id}
 ```
 
-**Брак между независимыми деревьями** - прямое ребро между узлами разных владельцев создать
-нельзя, только через предложение/подтверждение:
+**Marriage between independent trees** - a direct edge between nodes of different owners cannot
+be created directly, only through a proposal/confirmation:
 
 ```mermaid
 sequenceDiagram
@@ -437,38 +440,38 @@ sequenceDiagram
     participant R as graph/router
     participant S as graph/service
 
-    OwnerA->>R: POST /persons/{id}/invite-code (свой узел)
+    OwnerA->>R: POST /persons/{id}/invite-code (their own node)
     R->>S: generate_invite_code_for_person
-    S-->>OwnerA: "ABCD1234" (передаётся вне приложения)
+    S-->>OwnerA: "ABCD1234" (shared outside the app)
 
-    OwnerB->>R: POST /marriage-proposals {person_a_id: свой узел, target_invite_code: "ABCD1234"}
+    OwnerB->>R: POST /marriage-proposals {person_a_id: their own node, target_invite_code: "ABCD1234"}
     R->>S: create_marriage_proposal
     S->>S: can_edit_graph(A)? can_edit_graph(B)?
-    alt оба узла редактируются ОДНИМ пользователем
-        S->>S: создать Relationship(spouse_of) сразу + _link_clusters(marriage)
-        S-->>OwnerB: RelationshipProposal{status: "confirmed"} (мгновенно)
-    else разные владельцы
+    alt both nodes are edited by THE SAME user
+        S->>S: create Relationship(spouse_of) immediately + _link_clusters(marriage)
+        S-->>OwnerB: RelationshipProposal{status: "confirmed"} (instantly)
+    else different owners
         S-->>OwnerB: RelationshipProposal{status: "pending"}
-        OwnerB->>R: GET /marriage-proposals (видит исходящее)
-        OwnerA->>R: GET /marriage-proposals (видит входящее)
+        OwnerB->>R: GET /marriage-proposals (sees the outgoing one)
+        OwnerA->>R: GET /marriage-proposals (sees the incoming one)
         OwnerA->>R: POST /marriage-proposals/{id}/confirm
         R->>S: confirm_marriage_proposal
-        S->>S: создать Relationship(spouse_of, marriage_year)
-        S->>S: _link_clusters(A, B, "marriage") -> GraphLink + релейбл origin_label
+        S->>S: create Relationship(spouse_of, marriage_year)
+        S->>S: _link_clusters(A, B, "marriage") -> GraphLink + relabel origin_label
         S-->>OwnerA: RelationshipProposal{status: "confirmed"}
     end
 ```
 
-#### 4.2. Алгоритм мэтчинга
+#### 4.2. Matching Algorithm
 
-Цель - не "найти совпадение по имени", а собрать доказательную цепочку общих предков между двумя
-независимо заполненными деревьями, и только при достаточной длине/уверенности этой цепочки
-предложить её пользователям на подтверждение.
+The goal isn't to "find a name match," but to assemble an evidentiary chain of common ancestors
+between two independently filled-in trees, and only when that chain is long/confident enough to
+offer it to the users for confirmation.
 
-**От мутации графа до записи матча и уведомления.** Пересчёт всегда полный (по всем 5 этапам
-заново) - триггерится любым созданием/правкой узла или связи (`POST /persons`,
-`PATCH /persons/{id}`, `POST /persons/insert-between`, `POST /relationships`), выполняется в фоне
-уже после того, как клиент получил ответ:
+**From a graph mutation to a recorded match and notification.** The recomputation is always
+full (all 5 stages from scratch) - triggered by any node or relationship creation/edit
+(`POST /persons`, `PATCH /persons/{id}`, `POST /persons/insert-between`, `POST /relationships`), and
+runs in the background after the client has already received a response:
 
 ```mermaid
 sequenceDiagram
@@ -484,61 +487,61 @@ sequenceDiagram
     participant N as notifications.service
 
     C->>R: POST /persons | PATCH /persons/{id} | POST /relationships
-    R->>DB: commit мутации графа
-    R-->>C: 200 (ответ уходит СРАЗУ, до пересчёта)
+    R->>DB: commit the graph mutation
+    R-->>C: 200 (the response is sent IMMEDIATELY, before recomputation)
     R->>BG: add_task(recompute_for_person_task, person_id)
 
-    BG->>M: recompute_for_person(person_id)  [своя DB-сессия]
-    M->>CTE: предки person'а (child_of, вверх, без ограничения глубины)
+    BG->>M: recompute_for_person(person_id)  [its own DB session]
+    M->>CTE: person's ancestors (child_of, upward, unlimited depth)
     M->>F1: find_candidates(person)
-    F1->>DB: similarity(normalized_name) > 0.6 AND owner_user_id != AND origin_label != , ORDER BY гео, LIMIT 200
-    DB-->>F1: до 200 кандидатов
+    F1->>DB: similarity(normalized_name) > 0.6 AND owner_user_id != AND origin_label != , ORDER BY geography, LIMIT 200
+    DB-->>F1: up to 200 candidates
     F1-->>M: candidates[]
 
-    loop для каждого кандидата
-        M->>M: hard reject если candidate.gender != person.gender
+    loop for each candidate
+        M->>M: hard reject if candidate.gender != person.gender
         M->>A: align_and_score(person, ancestors, candidate)
-        A->>CTE: предки кандидата
-        alt gen=0 (сама якорная пара) ниже NODE_MATCH_MIN_CONFIDENCE
+        A->>CTE: candidate's ancestors
+        alt gen=0 (the anchor pair itself) below NODE_MATCH_MIN_CONFIDENCE
             A-->>M: (0.0, discard, {"reason": "root_pair_below_threshold"})
         else
             loop gen = 1..MAX_CHAIN_DEPTH(10)
-                A->>A: person-сторона на глубине ровно gen, candidate-сторона на [gen-2, gen+2] минус уже использованные
-                A->>A: node_confidence на каждую пару (hard gender reject), оставить >= 0.4
-                A->>A: лучшая пара -> NodeMatch поколения, sibling_count = кол-во person-side узлов с уверенным совпадением
+                A->>A: person side at exactly depth gen, candidate side at [gen-2, gen+2] minus already used ones
+                A->>A: node_confidence for each pair (hard gender reject), keep >= 0.4
+                A->>A: best pair -> generation's NodeMatch, sibling_count = number of person-side nodes with a confident match
             end
             A->>A: chain_score(node_matches) -> final_match_score(chain, person, candidate)
-            A->>A: порог: >=0.75 high_confidence / >=0.45 possible_match / иначе discard
+            A->>A: threshold: >=0.75 high_confidence / >=0.45 possible_match / otherwise discard
             A-->>M: (final_score, status, evidence)
         end
         M->>U: _upsert_match(person, candidate, score, status, evidence)
-        U->>DB: canonical_order по str(id) -> SELECT существующий MatchCandidate(person_a,person_b)
-        alt уже resolved (confirmed или rejected любой стороной)
-            U->>U: молча пропустить - фоновый пересчёт не переписывает решение человека
-        else новая запись
+        U->>DB: canonical_order by str(id) -> SELECT existing MatchCandidate(person_a,person_b)
+        alt already resolved (confirmed or rejected by either side)
+            U->>U: silently skip - background recomputation doesn't override a human decision
+        else new record
             U->>DB: INSERT MatchCandidate
             alt status != discard
-                U->>N: create_notification(оба владельца, NEW_MATCH)
+                U->>N: create_notification(both owners, NEW_MATCH)
             end
-        else существующая, ещё не resolved
+        else existing, not yet resolved
             U->>DB: UPDATE score/status/evidence
             alt |Δscore| > 0.15 AND status != discard
-                U->>N: create_notification(оба владельца, MATCH_SCORE_CHANGED)
+                U->>N: create_notification(both owners, MATCH_SCORE_CHANGED)
             end
         end
     end
 ```
 
-**Формула скоринга** - три уровня весов, точные значения:
+**Scoring formula** - three levels of weights, exact values:
 
 ```mermaid
 flowchart TD
     subgraph "Node-level - node_confidence(a, b, gen_a, gen_b)"
         NS["name_sim = rapidfuzz.ratio(a,b) / 100"]
-        RAR["rarity = 1.0 / 0.7 / 0.4 / 0.15\nпо числу других persons с тем же именем\n(капа 0.4 если имя в списке частых казахских имён)"]
-        GEO["geo = 0.5 неизвестно / 1.0 та же страна+регион\n/ 0.8 та же страна / 0.6 правдоподобная миграция (KZ↔RU,MN,CN,UZ) / 0.15 иначе"]
-        GEN["gen_plaus = структурная{0:1.0,1:0.7,2:0.3,иначе:0.05}\nесли оба birth_year известны: 50/50 с year_score(|Δ|<=10 -> 1.0)"]
-        ETH["ethnic_mod ∈ [-0.35, +0.20]\nсовпадение ru/tribe/zhuz -> бонус, конфликт -> штраф, нет данных -> 0"]
+        RAR["rarity = 1.0 / 0.7 / 0.4 / 0.15\nby the number of other persons with the same name\n(capped at 0.4 if the name is in the list of common Kazakh names)"]
+        GEO["geo = 0.5 unknown / 1.0 same country+region\n/ 0.8 same country / 0.6 plausible migration (KZ↔RU,MN,CN,UZ) / 0.15 otherwise"]
+        GEN["gen_plaus = structural{0:1.0,1:0.7,2:0.3,otherwise:0.05}\nif both birth_year known: 50/50 with year_score(|Δ|<=10 -> 1.0)"]
+        ETH["ethnic_mod ∈ [-0.35, +0.20]\nru/tribe/zhuz match -> bonus, conflict -> penalty, no data -> 0"]
         BASE["base = name_sim·0.38 + rarity·0.24 + geo·0.18 + gen_plaus·0.13"]
         NODE["node_confidence = clamp(base + ethnic_mod·0.07)"]
         NS --> BASE
@@ -550,11 +553,11 @@ flowchart TD
     end
 
     subgraph "Chain-level - chain_score(node_matches)"
-        AVG["avg_conf = mean(confidence по всем NodeMatch)"]
-        LEN["chain_length = самый длинный НЕПРЕРЫВНЫЙ участок поколений от gen=0\n(один пропуск обрывает счёт, даже если глубже есть совпадения)"]
+        AVG["avg_conf = mean(confidence across all NodeMatch)"]
+        LEN["chain_length = the longest CONTINUOUS run of generations from gen=0\n(a single gap breaks the count, even if there are matches deeper)"]
         MULT["length_multiplier {1:0.35, 2:0.65, 3:0.90, 4+:1.0}"]
-        SIB["sibling_bonus = +0.15 если на каком-то gen>0 несколько person-side узлов совпали уверенно"]
-        COMP["completeness_factor = 0.6 + 0.4·(доля заполненных полей birth_year/country/region/ru/tribe/zhuz)"]
+        SIB["sibling_bonus = +0.15 if at some gen>0 multiple person-side nodes matched confidently"]
+        COMP["completeness_factor = 0.6 + 0.4·(share of filled fields birth_year/country/region/ru/tribe/zhuz)"]
         CHAIN["chain_score = clamp((avg_conf·length_multiplier + sibling_bonus) · completeness_factor)"]
         NODE --> AVG
         AVG --> CHAIN
@@ -565,7 +568,7 @@ flowchart TD
 
     subgraph "Context-level - final_match_score"
         SRC["source_factor = avg(SOURCE_TRUST[a.source_type], SOURCE_TRUST[b.source_type])\noral_tradition 0.6 / photo 0.8 / family_document 0.85 / archival_record 1.0"]
-        RU["ru_bonus = +0.08 если оба ru совпадают"]
+        RU["ru_bonus = +0.08 if both ru match"]
         CONF["confirmation_multiplier = 1 + min(0.1, 0.02·min(confirmation_count_a, confirmation_count_b))"]
         FINAL["final_score = clamp(chain_score·(0.7+0.3·source_factor) + ru_bonus) · confirmation_multiplier"]
         CHAIN --> FINAL
@@ -577,15 +580,16 @@ flowchart TD
     FINAL --> D{"final_score"}
     D -->|">= 0.75"| HC["high_confidence"]
     D -->|">= 0.45"| PM["possible_match"]
-    D -->|"иначе"| DISC["discard"]
+    D -->|"otherwise"| DISC["discard"]
 ```
 
-Ключевая идея весов: единичное совпадение имени (`chain_length=1`) даёт множитель всего **0.35** -
-это ровно случай "однофамилец", а не родственник. Доказательная сила растёт нелинейно с длиной
-непрерывной цепочки совпавших поколений, а не с одним ярким совпадением.
+The key idea behind the weights: a single name match (`chain_length=1`) yields a multiplier of
+only **0.35** - this is exactly the "same surname, unrelated" case, not an actual relative.
+Evidentiary strength grows nonlinearly with the length of a continuous chain of matched
+generations, rather than with one striking match.
 
-**Подтверждение и слияние кластеров** - автоматическое объединение веток никогда не происходит,
-даже `high_confidence` остаётся предложением, требующим явного согласия обеих сторон:
+**Confirmation and cluster merging** - automatic merging of branches never happens; even
+`high_confidence` remains a proposal requiring explicit consent from both sides:
 
 ```mermaid
 sequenceDiagram
@@ -599,128 +603,128 @@ sequenceDiagram
 
     OwnerA->>R: POST /matches/{id}/confirm
     R->>S: confirm_match(match, current_user=A)
-    S->>S: person_a_confirmed = True (только своя сторона)
-    S->>DB: commit (confirmed_at всё ещё NULL - ждём вторую сторону)
+    S->>S: person_a_confirmed = True (only their own side)
+    S->>DB: commit (confirmed_at is still NULL - waiting for the other side)
 
     OwnerB->>R: POST /matches/{id}/confirm
     R->>S: confirm_match(match, current_user=B)
     S->>S: person_b_confirmed = True
-    alt обе стороны подтвердили
+    alt both sides confirmed
         S->>S: confirmed_at = now()
         S->>LC: _link_clusters(person_a, person_b, "match_confirmed", source_match_id)
         LC->>DB: INSERT GraphLink(link_type=match_confirmed)
-        LC->>DB: UPDATE persons SET origin_label = origin_label(A) WHERE id IN (весь компонент B) - union-find релейбл
-        S->>S: confirmation_count += 1 для обоих (ПОСЛЕ релейбла - _propagate_origin_label делает db.refresh, стёр бы несохранённые изменения)
+        LC->>DB: UPDATE persons SET origin_label = origin_label(A) WHERE id IN (B's entire component) - union-find relabel
+        S->>S: confirmation_count += 1 for both (AFTER the relabel - _propagate_origin_label calls db.refresh, which would wipe out unsaved changes)
         S->>DB: commit
-    else только одна сторона (пока)
-        Note over S: confirmed_at остаётся NULL, ждём вторую сторону
+    else only one side (so far)
+        Note over S: confirmed_at remains NULL, waiting for the other side
     end
 
-    Note over LC,DB: С этого момента find_candidates (Этап 1) фильтрует по origin_label != -<br/>эта пара/кластер больше НЕ предложится заново при последующих пересчётах.
+    Note over LC,DB: From this point on, find_candidates (Stage 1) filters by origin_label != -<br/>this pair/cluster will NOT be proposed again in subsequent recomputations.
 ```
 
-`reject_match` - зеркально, но никогда не вызывает `_link_clusters`; отклонение одной стороной
-финально блокирует повторное confirm с этой же стороны.
+`reject_match` is the mirror image, but never calls `_link_clusters`; rejection by one side
+permanently blocks a repeat confirm from that same side.
 
-## Запуск проекта
+## Running the Project
 
-1. Скопировать `.env.example` в `.env` и заполнить значения (`DATABASE_URL`, `POSTGRES_*`,
-   `JWT_SECRET_KEY`, порты и т.д.) - без `JWT_SECRET_KEY`/`DATABASE_URL` приложение не запустится.
-2. Поднять backend + PostgreSQL одной командой:
+1. Copy `.env.example` to `.env` and fill in the values (`DATABASE_URL`, `POSTGRES_*`,
+   `JWT_SECRET_KEY`, ports, etc.) - the application won't start without `JWT_SECRET_KEY`/`DATABASE_URL`.
+2. Bring up the backend + PostgreSQL with a single command:
    ```
    make up
    ```
-3. Применить миграции БД:
+3. Apply DB migrations:
    ```
    make migrate
    ```
-4. Backend доступен на `http://localhost:<BACKEND_PORT>/api`, Swagger - на `/docs`.
+4. The backend is available at `http://localhost:<BACKEND_PORT>/api`, Swagger at `/docs`.
 
-Прочие полезные команды из `Makefile`:
+Other useful commands from the `Makefile`:
 
-- `make down` / `make restart` - остановить / пересобрать и перезапустить контейнеры
-- `make logs` - логи backend-контейнера
-- `make makemigrations m="описание"` - сгенерировать новую Alembic-миграцию по изменениям в моделях
-- `make reset-db` - **полный** сброс БД (роняет volume целиком) + миграции с нуля, для чистого
-  окружения
-- `make sync` - синхронизировать зависимости через `uv`
-- `make run` - локальный запуск без Docker (нужна доступная PostgreSQL, см. `.env`)
-- `make matching-test` - нагрузочный/точностный тест алгоритма мэтчинга на синтетических деревьях
+- `make down` / `make restart` - stop / rebuild and restart the containers
+- `make logs` - backend container logs
+- `make makemigrations m="description"` - generate a new Alembic migration from model changes
+- `make reset-db` - a **full** DB reset (drops the entire volume) + migrations from scratch, for
+  a clean environment
+- `make sync` - sync dependencies via `uv`
+- `make run` - local run without Docker (requires an available PostgreSQL, see `.env`)
+- `make matching-test` - a load/accuracy test of the matching algorithm on synthetic trees
   (`Jeli-Bruno/scripts/matching_load_test.py`)
 
-## Тестирование
+## Testing
 
-Все эндпоинты покрыты автоматизированной коллекцией **Bruno** - `Jeli-Bruno/` в корне проекта.
-Переменные окружения лежат в `Jeli-Bruno/environments/local.yml`, а папка `scenario/` прогоняет
-реалистичный многопользовательский сценарий (несколько аккаунтов, пересекающиеся деревья, чаты,
-мэтчинг, коллабораторы) целиком через реальный HTTP API. Прогнать весь набор:
+All endpoints are covered by an automated **Bruno** collection - `Jeli-Bruno/` at the project
+root. Environment variables live in `Jeli-Bruno/environments/local.yml`, and the `scenario/` folder
+runs a realistic multi-user scenario (several accounts, overlapping trees, chats, matching,
+collaborators) entirely through the real HTTP API. To run the whole suite:
 
 ```
 cd Jeli-Bruno && npx --yes @usebruno/cli run . -r --env local --tests-only
 ```
 
-(`--tests-only` пропускает единственный нативный `type: websocket` элемент коллекции, который CLI не
-умеет исполнять - он существует только для ручной проверки в десктоп-приложении Bruno.)
+(`--tests-only` skips the collection's single native `type: websocket` item, which the CLI can't
+execute - it exists only for manual verification in the Bruno desktop app.)
 
 
 
-# Описание клиентской части
+# Frontend Description
 
-## Стэк
+## Stack
 
-Клиентская часть проекта выполнена целиком на **JavaScript (JSX)** с использованием **React 19**, сборка — через **Vite 8**. Ключевые зависимости:
+The frontend is built entirely in **JavaScript (JSX)** using **React 19**, bundled with **Vite 8**. Key dependencies:
 
-1. **Vite** — сборщик и dev-сервер (`npm run dev` / `npm run build` / `npm run preview`)
-2. **React 19** + **react-dom** — UI-библиотека
-3. **react-router-dom v7** — маршрутизация (защищённые/публичные роуты, вложенный layout)
-4. **@xyflow/react (React Flow) v12** — рендеринг графа семьи (кастомные ноды/рёбра, зум, панорамирование)
-5. **@dagrejs/dagre** — вспомогательный layout-движок, используется в `utils/buildFlow.js` только для первичного «посева» порядка узлов слева-направо (crossing-minimization); финальные координаты считаются собственным sweep-алгоритмом поверх Dagre
-6. **axios** — HTTP-клиент, единый инстанс с интерцепторами (`api/axiosConfig.js`)
-7. **react-markdown** — рендер истории семьи
-8. **react-icons** — иконки
+1. **Vite** — the bundler and dev server (`npm run dev` / `npm run build` / `npm run preview`)
+2. **React 19** + **react-dom** — the UI library
+3. **react-router-dom v7** — routing (protected/public routes, nested layout)
+4. **@xyflow/react (React Flow) v12** — rendering the family graph (custom nodes/edges, zoom, panning)
+5. **@dagrejs/dagre** — an auxiliary layout engine, used in `utils/buildFlow.js` only to "seed" the initial left-to-right node ordering (crossing minimization); the final coordinates are computed by a custom sweep algorithm on top of Dagre
+6. **axios** — the HTTP client, a single instance with interceptors (`api/axiosConfig.js`)
+7. **react-markdown** — rendering the family history
+8. **react-icons** — icons
 
-## Архитектура
+## Architecture
 
-SPA (Single Page Application), полностью отделённая от бэкенда — разворачивается отдельно, общается с `jeli-server` только через REST API (JSON) по base URL, сконфигурированному в `api/axiosConfig.js`. Аутентификация — JWT, хранится и подставляется в заголовки через интерцептор axios; при 401 — редирект на логин через `ProtectedRoute`.
+An SPA (Single Page Application), fully decoupled from the backend — deployed separately, communicating with `jeli-server` only via a REST API (JSON) at the base URL configured in `api/axiosConfig.js`. Authentication is JWT-based, stored and attached to headers via an axios interceptor; on a 401, it redirects to login via `ProtectedRoute`.
 
-## Структура проекта
+## Project Structure
 
 ```
 front/
-├── index.html                  # точка входа Vite
+├── index.html                  # Vite entry point
 ├── vite.config.js
 ├── package.json
 └── src/
-    ├── main.jsx                 # точка входа React, монтирование в DOM
-    ├── index.css                # глобальные стили
-    ├── Routes/                  # маршрутизация
-    ├── Pages/                    # экраны, привязанные к роутам
-    ├── Components/               # переиспользуемые составные блоки, 
-    ├── UI/                       # низкоуровневые примитивы дизайн-системы
-    └── utils/                    # чистые хелперы и React-контекст
+    ├── main.jsx                 # React entry point, mounts into the DOM
+    ├── index.css                # global styles
+    ├── Routes/                  # routing
+    ├── Pages/                    # screens tied to routes
+    ├── Components/               # reusable composite blocks, 
+    ├── UI/                       # low-level design-system primitives
+    └── utils/                    # pure helpers and React context
 ```
 
-## Ключевые архитектурные решения
+## Key Architectural Decisions
 
-- **Граф — не декларативный layout библиотеки, а собственный алгоритм** (`buildFlow.js`): Dagre используется только для получения относительного порядка узлов (crossing minimization), а итоговые координаты — результат ручного sweep'а, который держит пары (`couple`/`union`) рядом и центрирует поколения друг над другом. Это осознанный выбор ради «семейного» вида графа (пара всегда соседствует, дети — под общим союзом), которого стандартный Dagre-layout не даёт из коробки.
-- **API-слой полностью отделён от компонентов** — компоненты не работают с axios напрямую, только через `api/*Service.js`, что зеркалит структуру бэкенд-фич (`graph`, `auth`, `media`, `messenger`, `notifications`).
-- **Роуты защищены на уровне обёрток** (`ProtectedRoute`/`PublicOnlyRoute`), а не проверками внутри каждой страницы.
+- **The graph is not the library's declarative layout but a custom algorithm** (`buildFlow.js`): Dagre is used only to obtain the relative ordering of nodes (crossing minimization), while the final coordinates are the result of a manual sweep that keeps pairs (`couple`/`union`) next to each other and centers generations above one another. This is a deliberate choice for a "family-style" graph view (a couple is always adjacent, children sit under their shared union), which the standard Dagre layout doesn't provide out of the box.
+- **The API layer is fully decoupled from components** — components never work with axios directly, only through `api/*Service.js`, which mirrors the backend feature structure (`graph`, `auth`, `media`, `messenger`, `notifications`).
+- **Routes are protected at the wrapper level** (`ProtectedRoute`/`PublicOnlyRoute`), rather than with checks inside each individual page.
 
-## Запуск проекта
+## Running the Project
 
-1. Должен быть установлен Node.js:
+1. Node.js must be installed:
 ```
 node -v
 ```
 
-2. Выполнение команды установки всех зависимостей:
+2. Run the command to install all dependencies:
 ```
 npm install
 ```
 
-3. Запуск локального сервера
+3. Start the local server
 ```
 npm run dev
 ```
 
-4. Платформа доступна по ссылке: http://localhost:5173
+4. The platform is available at: http://localhost:5173

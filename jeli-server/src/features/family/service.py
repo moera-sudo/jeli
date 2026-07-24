@@ -1,6 +1,6 @@
-# Бизнес-логика фичи family: одна общая markdown-история на ГРАФ (ключ — владелец графа).
-# Любой участник графа (владелец, коллаборатор или привязанный к узлу член семьи) правит
-# одну и ту же запись, и итоговая версия видна всем членам семьи.
+# Business logic for the family feature: one shared markdown history per GRAPH (keyed by graph owner).
+# Any graph participant (owner, collaborator, or a family member linked to a node) edits the
+# same record, and the resulting version is visible to all family members.
 import logging
 import uuid
 
@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 
 async def resolve_graph_owner_id(db: AsyncSession, user: User) -> uuid.UUID:
-    # * Общая история привязана к владельцу графа. Определяем граф текущего пользователя
-    # * по его узлу: owner_user_id узла = владелец графа. Если узла ещё нет — историей
-    # * владеет он сам (это его будущий собственный граф).
+    # * The shared history is keyed to the graph owner. We determine the current user's graph
+    # * via their node: the node's owner_user_id is the graph owner. If there's no node yet, the
+    # * history is owned by the user themselves (this will be their own future graph).
     person = await graph_service.get_linked_person(db, user.id)
     return person.owner_user_id if person is not None else user.id
 
@@ -37,10 +37,10 @@ async def get_family_or_404(db: AsyncSession, owner_user_id: uuid.UUID) -> Famil
 
 
 async def upsert_family(db: AsyncSession, current_user: User, data: FamilyUpsertRequest) -> Family:
-    # ** История общая на весь граф — пишем под ВЛАДЕЛЬЦА графа, а не под автора правки.
-    # ** Любой член семьи (в т.ч. рядовой участник, не только владелец/коллаборатор) правит
-    # ** одну и ту же запись, итог виден всем. Право на запись = принадлежность графу:
-    # ** owner резолвится по узлу самого пользователя, поэтому он всегда участник своего графа.
+    # ** The history is shared across the whole graph — we write under the graph OWNER, not the editor.
+    # ** Any family member (including a regular participant, not just owner/collaborator) edits the
+    # ** same record, and the result is visible to everyone. The right to write = graph membership:
+    # ** owner is resolved via the user's own node, so they are always a member of their own graph.
     owner_user_id = await resolve_graph_owner_id(db, current_user)
 
     family = await get_family(db, owner_user_id)

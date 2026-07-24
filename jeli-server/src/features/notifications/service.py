@@ -1,4 +1,4 @@
-# Бизнес-логика фичи notifications: создание/чтение уведомлений, доставка через WebSocket.
+# Business logic for the notifications feature: creating/reading notifications, delivery over WebSocket.
 import logging
 import uuid
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 async def create_notification(db: AsyncSession, user_id: uuid.UUID, type_: str, payload: dict) -> Notification:
-    # * Пишет в БД ВСЕГДА (история + оффлайн-доступ), пушит по WS только если пользователь онлайн.
+    # * ALWAYS writes to the DB (history + offline access), pushes over WS only if the user is online.
     notification = Notification(user_id=user_id, type=type_, payload=payload)
     db.add(notification)
     await db.commit()
@@ -70,7 +70,7 @@ async def mark_all_read(db: AsyncSession, user_id: uuid.UUID) -> None:
 
 
 async def delete_notification(db: AsyncSession, user_id: uuid.UUID, notification_id: uuid.UUID) -> None:
-    # * Удаляет одно уведомление пользователя (проверка владельца — в get_notification_or_404).
+    # * Deletes a single notification belonging to the user (ownership check — in get_notification_or_404).
     notification = await get_notification_or_404(db, user_id, notification_id)
     await db.delete(notification)
     await db.commit()

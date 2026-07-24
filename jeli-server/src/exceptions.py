@@ -1,5 +1,5 @@
-# Базовые классы исключений приложения и регистрация обработчиков FastAPI.
-# Сообщения (message), возвращаемые клиенту, и логи — на английском языке.
+# Base application exception classes and registration of FastAPI exception handlers.
+# The messages returned to the client and the logs are in English.
 import logging
 
 from fastapi import FastAPI, Request, status
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class AppException(Exception):
-    # * Базовое исключение приложения.
+    # * Base application exception.
     status_code: int = status.HTTP_400_BAD_REQUEST
     message: str = "An error occurred"
 
@@ -40,7 +40,7 @@ class UnauthorizedError(AppException):
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    # * Регистрирует обработчики AppException и непредвиденных исключений.
+    # * Registers handlers for AppException and unhandled exceptions.
 
     @app.exception_handler(AppException)
     async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
@@ -54,7 +54,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        # ! Неожиданное исключение — логируем со стектрейсом, клиенту отдаём общий текст
+        # ! Unexpected exception — log it with a stack trace, return a generic message to the client
         logger.error("Unhandled exception on %s", request.url.path, exc_info=True)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

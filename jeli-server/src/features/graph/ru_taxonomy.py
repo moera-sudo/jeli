@@ -1,24 +1,25 @@
-# Справочник ру/тайпа -> (тайпа, жуз). Кириллический (казахи вводят названия родов кириллицей),
-# с фолдингом казахских букв в близкие русские, чтобы "Арғын"/"Аргын", "Әлімұлы"/"Алимулы" и т.п.
-# матчились одинаково независимо от раскладки. Best-effort набор распространённых родов по трём жузам —
-# не претендует на полноту (см. docs/matching-algorhitm.md §4), покрывает наиболее частые ру/тайпа.
+# Ru/tribe -> (tribe, zhuz) lookup. Cyrillic (Kazakhs type clan names in Cyrillic), with folding of
+# Kazakh letters to their closest Russian equivalents so "Арғын"/"Аргын", "Әлімұлы"/"Алимулы" etc.
+# match the same regardless of which keyboard layout was used. Best-effort set of common clans across
+# the three zhuzes — not exhaustive (see docs/matching-algorhitm.md §4), covers the most frequent ru/tribe.
 from rapidfuzz import fuzz, process
 
 RU_TAXONOMY_FUZZY_THRESHOLD = 0.82
 
-# * Казахские буквы -> близкие русские: снимает разницу раскладок при вводе одного и того же рода.
+# * Kazakh letters -> closest Russian equivalents: removes layout differences when typing the same clan.
 _FOLD = str.maketrans({
     "ә": "а", "ғ": "г", "қ": "к", "ң": "н", "ө": "о", "ұ": "у", "ү": "у", "һ": "х", "і": "и",
 })
 
 
 def _fold(value: str) -> str:
-    # * Нормализация ключа/ввода: trim + lower + фолдинг казахских букв.
+    # * Key/input normalization: trim + lower + fold Kazakh letters.
     return value.strip().lower().translate(_FOLD)
 
 
-# * Ключи — и уровня ТАЙПА (само на себя), и уровня РУ (на свою тайпу): человек может вписать в поле
-# * "ру" как конкретный род, так и название тайпы. Значение — (тайпа, жуз) в читаемой кириллице.
+# * Keys cover both the TRIBE level (mapped to itself) and the RU level (mapped to its tribe): a person
+# * may enter either a specific clan or the tribe name in the "ru" field. Value is (tribe, zhuz) in
+# * readable Cyrillic.
 _RAW: dict[str, tuple[str, str]] = {
     # ---------------------------------------------------------------- Ұлы жүз
     "уйсын": ("Уйсын", "Улы жуз"), "уйсун": ("Уйсын", "Улы жуз"),
@@ -56,12 +57,12 @@ _RAW: dict[str, tuple[str, str]] = {
     "телеу": ("Жетыру", "Киши жуз"), "рамадан": ("Жетыру", "Киши жуз"),
 }
 
-# * Итоговый справочник с фолдингнутыми ключами (устраняем казахские буквы в самих ключах тоже).
+# * Final lookup with folded keys (removes Kazakh letters from the keys themselves too).
 RU_TAXONOMY: dict[str, tuple[str, str]] = {_fold(k): v for k, v in _RAW.items()}
 
 
 def derive_tribe_zhuz(ru: str | None) -> tuple[str, str] | None:
-    # * Точное совпадение по нормализованному ключу, затем fuzzy-подбор (rapidfuzz, порог > 0.82).
+    # * Exact match on the normalized key, then fuzzy lookup (rapidfuzz, threshold > 0.82).
     if not ru:
         return None
     key = _fold(ru)
